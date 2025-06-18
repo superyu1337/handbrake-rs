@@ -1,0 +1,13 @@
+[package]
+name = "handbrake-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-stream = "0.3.6"
+futures = "0.3.31"
+regex = "1.11.1"
+thiserror = "2.0.12"
+tokio = { version = "1.45.1", features = ["full"] }
+async-trait = "0.1.80"
+once_cell = "1.19.0" # Added for static initialization
