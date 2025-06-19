@@ -1,11 +1,18 @@
 use std::env;
 use std::path::PathBuf;
+#[cfg(not(test))]
 use tokio::process::Command;
 
 mod error;
 mod event;
 mod handle;
 mod job;
+
+#[cfg(test)]
+mod testing;
+
+#[cfg(test)]
+use testing::mock_command::{MockCommand as Command};
 
 /// Validates that the given path points to a runnable HandBrakeCLI executable.
 /// Runs `HandBrakeCLI --version` and checks the exit code.

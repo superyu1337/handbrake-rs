@@ -18,7 +18,7 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Implement the private `validate_executable` function using `tokio::process::Command` to run `--version`.
 - [X] Integrate `validate_executable` into the `new()` and `new_with_path()` constructors.
 - [X] Implement the `HandBrake::version()` method to return the version string.
-- [ ] Add `Command` wrapper, that can be used to run `HandBrakeCLI` commands, and to simulate the output of `HandBrakeCLI` commands in tests.
+- [X] Add `Command` wrapper, called `MockCommand`, that is used to run `HandBrakeCLI` commands, and to simulate the output of `HandBrakeCLI` commands in tests.
 - [ ] Create unit tests for the discovery and validation logic.
 
 ## Chunk 3: Job Configuration (`JobBuilder`)
