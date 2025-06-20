@@ -76,6 +76,7 @@ pub use event::{JobEvent, JobFailure, JobSummary, Log, LogLevel, Progress};
 pub use job::{InputSource, JobBuilder, OutputDestination}; // Will be re-exported later
 
 /// Represents the HandBrake executable.
+#[derive(Debug)]
 pub struct HandBrake {
     executable_path: PathBuf,
     version: String,
@@ -115,4 +116,81 @@ impl HandBrake {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::{validate_executable, HandBrake};
+    use crate::testing::mock_command::{MockCommandExpect, MockResult};
+    use std::path::PathBuf;
+
+    #[tokio::test]
+    async fn test_validate_executable_success() {
+        MockCommandExpect::clear_all_expectations();
+        let test_path = PathBuf::from("/usr/local/bin/HandBrakeCLI");
+        MockCommandExpect::when(&test_path)
+            .with_arg("--version")
+            .returns(MockResult::success().with_stdout(b"HandBrake 1.5.0\n"));
+
+        let version = validate_executable(&test_path).await.unwrap();
+        assert_eq!(version, "HandBrake 1.5.0");
+    }
+
+    #[tokio::test]
+    async fn test_validate_executable_failure_non_zero_exit() {
+        MockCommandExpect::clear_all_expectations();
+        let test_path = PathBuf::from("/usr/local/bin/HandBrakeCLI");
+        MockCommandExpect::when(&test_path)
+            .with_arg("--version")
+            .returns(MockResult::failure(1).with_stderr(b"Error: Something went wrong\n"));
+
+        let err = validate_executable(&test_path).await.unwrap_err();
+        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("command failed with exit code")));
+    }
+
+    #[tokio::test]
+    async fn test_validate_executable_failure_empty_output() {
+        MockCommandExpect::clear_all_expectations();
+        let test_path = PathBuf::from("/usr/local/bin/HandBrakeCLI");
+        MockCommandExpect::when(&test_path)
+            .with_arg("--version")
+            .returns(MockResult::success().with_stdout(b"")); // Empty stdout
+
+        let err = validate_executable(&test_path).await.unwrap_err();
+        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("returned empty output")));
+    }
+
+    #[tokio::test]
+    async fn test_validate_executable_failure_invalid_utf8() {
+        MockCommandExpect::clear_all_expectations();
+        let test_path = PathBuf::from("/usr/local/bin/HandBrakeCLI");
+        MockCommandExpect::when(&test_path)
+            .with_arg("--version")
+            .returns(MockResult::success().with_stdout(vec![0xC3, 0x28])); // Invalid UTF-8 sequence
+
+        let err = validate_executable(&test_path).await.unwrap_err();
+        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("Failed to parse version output as UTF-8")));
+    }
+
+    #[tokio::test]
+    async fn test_handbrake_new_with_path_success() {
+        MockCommandExpect::clear_all_expectations();
+        let test_path = PathBuf::from("/opt/handbrake/HandBrakeCLI");
+        MockCommandExpect::when(&test_path)
+            .with_arg("--version")
+            .returns(MockResult::success().with_stdout(b"HandBrake 1.6.0\n"));
+
+        let hb = HandBrake::new_with_path(&test_path).await.unwrap();
+        assert_eq!(hb.executable_path, test_path);
+        assert_eq!(hb.version(), "HandBrake 1.6.0");
+    }
+
+    #[tokio::test]
+    async fn test_handbrake_new_with_path_invalid_executable() {
+        MockCommandExpect::clear_all_expectations();
+        let test_path = PathBuf::from("/nonexistent/HandBrakeCLI");
+        MockCommandExpect::when(&test_path)
+            .with_arg("--version")
+            .returns(MockResult::failure(127).with_stderr(b"command not found\n"));
+
+        let err = HandBrake::new_with_path(&test_path).await.unwrap_err();
+        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("command failed with exit code")));
+    }
+}

@@ -19,7 +19,7 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Integrate `validate_executable` into the `new()` and `new_with_path()` constructors.
 - [X] Implement the `HandBrake::version()` method to return the version string.
 - [X] Add `Command` wrapper, called `MockCommand`, that is used to run `HandBrakeCLI` commands, and to simulate the output of `HandBrakeCLI` commands in tests.
-- [ ] Create unit tests for the discovery and validation logic.
+- [X] Create unit tests for the discovery and validation logic. (Note: `find_executable_in_path` and `HandBrake::new()` tests are deferred due to mocking complexities.)
 
 ## Chunk 3: Job Configuration (`JobBuilder`)
 - [X] Define `InputSource` and `OutputDestination` enums in `job.rs`.
