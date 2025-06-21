@@ -36,7 +36,7 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Configure `tokio::process::Command` with arguments from the builder.
 - [X] Implement correct `stdin`/`stdout`/`stderr` redirection logic within `status()`.
 - [X] Implement a simple example of using `status()` command.
-- [ ] Create an `#[ignore]` integration test in the `tests/` directory for the `status()` method.
+- [X] Create an `#[ignore]` integration test in the `tests/` directory for the `status()` method.
 
 ## Chunk 5: Monitored Execution (`start` and `JobHandle`)
 - [ ] Define the final event data structures in `event.rs`: `JobSummary` and `JobFailure`.
