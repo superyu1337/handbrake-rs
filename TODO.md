@@ -35,7 +35,7 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Implement the `async fn status()` method on `JobBuilder`.
 - [X] Configure `tokio::process::Command` with arguments from the builder.
 - [X] Implement correct `stdin`/`stdout`/`stderr` redirection logic within `status()`.
-- [ ] Implement a simple example of using `status()` command.
+- [X] Implement a simple example of using `status()` command.
 - [ ] Create an `#[ignore]` integration test in the `tests/` directory for the `status()` method.
 
 ## Chunk 5: Monitored Execution (`start` and `JobHandle`)
