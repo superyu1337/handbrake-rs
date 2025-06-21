@@ -39,7 +39,7 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Create an `#[ignore]` integration test in the `tests/` directory for the `status()` method.
 
 ## Chunk 5: Monitored Execution (`start` and `JobHandle`)
-- [ ] Define the final event data structures in `event.rs`: `JobSummary` and `JobFailure`.
+- [X] Define the final event data structures in `event.rs`: `JobSummary` and `JobFailure`.
 - [ ] Implement the `JobHandle` struct in `handle.rs` (containing `Child` and `mpsc::Receiver`).
 - [ ] Implement the `start()` method on `JobBuilder`.
 - [ ] In `start()`, create the `mpsc` channel for `JobEvent`s.

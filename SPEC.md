@@ -151,40 +151,40 @@ impl JobHandle {
 
 // --- Event Data Structures ---
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum JobEvent {
     Progress(Progress),
     Log(Log),
     Done(Result<JobSummary, JobFailure>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Progress {
     pub percentage: f32,
     pub fps: f32,
-    pub eta: String, // Or std::time::Duration
+    pub eta: Duration,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Log {
     pub level: LogLevel,
     pub message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum LogLevel {
     Info,
     Warning,
     Error,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct JobSummary {
-    pub total_time: std::time::Duration,
+    pub duration: std::time::Duration,
     pub average_fps: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct JobFailure {
     pub exit_code: Option<i32>,
     pub final_error_message: String,

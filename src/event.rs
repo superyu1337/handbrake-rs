@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 /// Represents an event emitted during a HandBrake job.
 #[derive(Debug)]
 pub enum JobEvent {
@@ -12,11 +14,10 @@ pub enum JobEvent {
 /// Represents the progress of a HandBrake job.
 #[derive(Debug)]
 pub struct Progress {
-    // Placeholder fields
-    pub percent_complete: f32,
+    pub percentage: f32,
     pub fps: f32,
     pub avg_fps: f32,
-    pub eta: String, // Or a more structured time type
+    pub eta: Duration,
 }
 
 /// Represents a log message from HandBrake stderr.
@@ -32,20 +33,17 @@ pub enum LogLevel {
     Info,
     Warning,
     Error,
-    Debug, // If we decide to parse debug logs
-    Unknown,
 }
 
 /// Summary of a completed job.
 #[derive(Debug)]
 pub struct JobSummary {
-    // Placeholder fields
-    pub duration: String, // Or a more structured time type
-    pub output_file: String,
+    pub duration: Duration,
+    pub avg_fps: f32,
 }
 
 /// Details of a job failure.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JobFailure {
     // Placeholder fields
     pub message: String,
