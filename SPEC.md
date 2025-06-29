@@ -129,7 +129,6 @@ impl JobBuilder {
 
 ```rust
 use futures::stream::Stream;
-use std::pin::Pin;
 
 pub struct JobHandle {
     // handle to the child process
@@ -145,14 +144,15 @@ impl JobHandle {
     /// (Sends SIGKILL on Unix, TerminateProcess on Windows).
     pub async fn kill(&self) -> Result<(), Error> { /* ... */ }
 
-    /// Returns a stream of events from the running job.
-    pub fn events(&mut self) -> Pin<Box<dyn Stream<Item = JobEvent> + Send>> { /* ... */ }
+    /// Returns an async stream of events from the running job.
+    pub fn events(&mut self) -> impl Stream<Item = JobEvent> { /* ... */ }
 }
 
 // --- Event Data Structures ---
 
 #[derive(Debug)]
 pub enum JobEvent {
+    Config(Config),
     Progress(Progress),
     Log(Log),
     Done(Result<JobSummary, JobFailure>),
@@ -181,13 +181,13 @@ pub enum LogLevel {
 #[derive(Debug)]
 pub struct JobSummary {
     pub duration: std::time::Duration,
-    pub average_fps: f32,
+    pub avg_fps: f32,
 }
 
 #[derive(Debug)]
 pub struct JobFailure {
     pub exit_code: Option<i32>,
-    pub final_error_message: String,
+    pub message: String,
 }
 ```
 
@@ -195,10 +195,11 @@ pub struct JobFailure {
 
 The implementation must correctly handle the `stdout` and `stderr` streams from the `HandBrakeCLI` child process.
 
-* **`stdout`**: If the `OutputDestination` is `Stdout`, the raw video data from the child process's `stdout` must be piped directly to the parent process's `stdout` without modification.
-* **`stderr`**: `HandBrakeCLI` writes all progress and log information to `stderr`. A dedicated asynchronous task must read `stderr` line by line.
+* **`stdout`**: If the `OutputDestination` is `Stdout`, the raw video data from the child process's `stdout` must be piped directly to the parent process's `stdout` without modification. `HandBrakeCLI` writes all progress information to `stdout`.
+* **`stderr`**: While the log information to `stderr`.A dedicated asynchronous task must read `stderr` and `stdout` line by line. Some lines will end with `\n`, while the progress lines use `\r`.
 * **Parsing Logic**:
     * Each line from `stderr` must be parsed to determine its type. Regular expressions (`regex` crate) are recommended for this.
+    * **JSON Job**: `HandBrakeCLI` will print as multiline JSON string the entire job configuration that should be correctly parsed into `JobConfig` struct.
     * **Progress Lines**: Lines matching a pattern like `Encoding: task ..., XX.XX %, ...` should be parsed into a `Progress` struct.
     * **Log Lines**: Non-progress lines should be categorized. Lines starting with "ERROR:" map to `LogLevel::Error`. Lines with "Warning:" map to `LogLevel::Warning`. All other lines can be treated as `LogLevel::Info`.
     * **Completion**: When the `stderr` stream closes and the process exits, a final `Done` event must be sent. The content of this event depends on the process's exit code. A zero exit code signifies success.
