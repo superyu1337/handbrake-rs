@@ -76,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             JobEvent::Done(result) => {
                 match result {
-                    Ok(()) => println!("Done! Encoding finished successfully."),
+                    Ok(status) => println!("Done! Encoding finished successfully with exit code: {}.", status),
                     Err(failure) => eprintln!("Encoding failed: {}", failure.message),
                 }
                 break; // Exit the loop

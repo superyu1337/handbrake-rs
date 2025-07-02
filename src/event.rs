@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::time::Duration;
+use std::{process::ExitStatus, time::Duration};
 
 /// Represents an event emitted during a HandBrake job.
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub enum JobEvent {
     /// Fragment of the output stream
     Fragment(Vec<u8>),
     /// The job has finished successfully or with a known failure.
-    Done(Result<(), JobFailure>),
+    Done(Result<ExitStatus, JobFailure>),
 }
 
 /// The full job configuration as reported by `HandBrakeCLI`.

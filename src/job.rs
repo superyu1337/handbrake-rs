@@ -206,6 +206,14 @@ impl JobBuilder {
             let mut job_config_buffer = String::new();
             let mut in_json_block = false;
 
+            #[derive(PartialEq)]
+            enum EventStreamState {
+                Active,
+                Done,
+            }
+
+            let mut event_parsing_state = EventStreamState::Active;
+
             loop {
                 let mut out_buf: Vec<u8> = Vec::new();
                 let line = select! {
@@ -261,7 +269,7 @@ impl JobBuilder {
                                     continue; // Continue buffering
                                 }
                             } else {
-                                Ok(if v == "HandBrake has exited." { JobEvent::Done(Ok(())) } else { JobEvent::Log(Log { message: v }) })
+                                Ok(if v == "HandBrake has exited." { event_parsing_state = EventStreamState::Done; break } else { JobEvent::Log(Log { message: v }) })
                             }
                         },
                         Some(Err(e)) => Err(std::io::Error::new(io::ErrorKind::InvalidData, e)),
@@ -271,16 +279,12 @@ impl JobBuilder {
 
                 match line {
                     Ok(event) => {
-                        let done = match &event {
-                            JobEvent::Done(_) => true,
-                            _ => false,
-                        };
                         let _ = event_tx.send(event).await;
                         // send the trailing/preceding output buffer
                         if out_buf.len() > 0 {
                             let _ = event_tx.send(JobEvent::Fragment(out_buf.to_vec())).await;
                         }
-                        if done {
+                        if event_parsing_state == EventStreamState::Done {
                             break;
                         }
                     }
@@ -293,7 +297,13 @@ impl JobBuilder {
                     }
                 };
             }
-            let _ = waiter.lock().await.wait().await;
+            match waiter.lock().await.wait().await {
+                Ok(status) => event_tx.send(JobEvent::Done(Ok(status))).await,
+                Err(e) => event_tx.send(JobEvent::Done(Err(crate::JobFailure {
+                    message: format!("Failed: {}", e),
+                    exit_code: e.raw_os_error(),
+                }))).await,
+            }
         });
 
         Ok(JobHandle { child, event_rx })
