@@ -49,8 +49,8 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] In `handle.rs`, implement `events()` to yield every event of the `Stream`.
 
 ## Chunk 6: Event Parsing & Streaming
-- [ ] Define `Config` struct and add `JobEvent::Config` variant in `event.rs` as per the spec.
-- [ ] Implement parsing logic for the JSON job configuration block into a `JobEvent::Config`.
+- [X] Define `Config` struct and add `JobEvent::Config` variant in `event.rs` as per the spec.
+- [X] Implement parsing logic for the JSON job configuration block into a `JobEvent::Config`.
 - [X] Implement parsing logic for `Progress` events from `stdout` lines using `regex`.
 - [X] Implement parsing logic for `Log` events from non-progress `stderr` lines.
 - [X] Implement simplified `Done` event.

@@ -54,7 +54,7 @@ pub struct DestinationConfig {
 pub struct VideoConfig {
     pub encoder: String,
     pub quality: f64,
-    pub preset: String,
+    pub preset: Option<String>,
 }
 
 /// Details about the audio tracks from the job configuration.

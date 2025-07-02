@@ -200,8 +200,11 @@ impl JobBuilder {
         // Spawn a background task to read from stderr and stdout and parse events.
         tokio::spawn(async move {
             let mut stdout_reader = BufReader::new(stdout);
-            // stderr logs are simple
             let mut stderr_reader = FramedRead::new(stderr, LinesCodec::default());
+
+            // State for parsing the JSON block
+            let mut job_config_buffer = String::new();
+            let mut in_json_block = false;
 
             loop {
                 let mut out_buf: Vec<u8> = Vec::new();
@@ -239,7 +242,28 @@ impl JobBuilder {
                         })
                     },
                     line = stderr_reader.next() => match line {
-                        Some(Ok(v)) => Ok(if v == "HandBrake has exited." { JobEvent::Done(Ok(())) } else { JobEvent::Log(Log { message: v }) }),
+                        Some(Ok(v)) => {
+                            if v.ends_with("json job:") {
+                                in_json_block = true;
+                                continue; // Continue to next iteration to buffer more lines
+                            }
+
+                            if in_json_block {
+                                job_config_buffer.push_str(&v);
+                                job_config_buffer.push('\n');
+                                if v == "}" {
+                                    in_json_block = false;
+                                    match serde_json::from_str::<crate::event::Config>(&job_config_buffer) {
+                                        Ok(config) => Ok(JobEvent::Config(config)),
+                                        Err(e) => Ok(JobEvent::Log(Log { message: format!("JSON Parse Error: {}, \n{}", e, job_config_buffer) })),
+                                    }
+                                } else {
+                                    continue; // Continue buffering
+                                }
+                            } else {
+                                Ok(if v == "HandBrake has exited." { JobEvent::Done(Ok(())) } else { JobEvent::Log(Log { message: v }) })
+                            }
+                        },
                         Some(Err(e)) => Err(std::io::Error::new(io::ErrorKind::InvalidData, e)),
                         None => continue,
                     },
