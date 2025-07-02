@@ -7,12 +7,14 @@ pub enum JobEvent {
     /// The initial job configuration, parsed from HandBrake's JSON output.
     /// This event is emitted once at the beginning of a monitored job.
     Config(Config),
-        /// Progress update (percentage, speed, etc.)
+    /// Progress update (percentage, speed, etc.)
     Progress(Progress),
     /// Log message from HandBrake stderr
     Log(Log),
+    /// Fragment of the output stream
+    Fragment(Vec<u8>),
     /// The job has finished successfully or with a known failure.
-    Done(Result<JobSummary, JobFailure>),
+    Done(Result<(), JobFailure>),
 }
 
 /// The full job configuration as reported by `HandBrakeCLI`.
@@ -76,30 +78,14 @@ pub struct AudioTrackConfig {
 pub struct Progress {
     pub percentage: f32,
     pub fps: f32,
-    pub avg_fps: f32,
-    pub eta: Duration,
+    pub avg_fps: Option<f32>,
+    pub eta: Option<Duration>,
 }
 
 /// Represents a log message from HandBrake stderr.
 #[derive(Debug)]
 pub struct Log {
-    pub level: LogLevel,
     pub message: String,
-}
-
-/// Represents the log level of a message.
-#[derive(Debug)]
-pub enum LogLevel {
-    Info,
-    Warning,
-    Error,
-}
-
-/// Summary of a completed job.
-#[derive(Debug)]
-pub struct JobSummary {
-    pub duration: Duration,
-    pub avg_fps: f32,
 }
 
 /// Details of a job failure.

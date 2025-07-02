@@ -2,18 +2,66 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::Stdio;
+use std::sync::Arc;
+use std::time::Duration;
 
+use futures::StreamExt;
+use futures::io;
+use once_cell::sync::Lazy;
+use regex::bytes::Captures;
+use regex::bytes::Regex;
+use tokio::io::AsyncBufReadExt;
+use tokio::io::BufReader;
 use tokio::process::Command;
+use tokio::select;
+use tokio::sync::{Mutex, mpsc};
+use tokio_util::codec::FramedRead;
+use tokio_util::codec::LinesCodec;
 
 use crate::error::Error;
+use crate::event::{JobEvent, Log};
+use crate::handle::JobHandle;
+
+static PROGRESS_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"Encoding: task \d+ of \d+, (?P<pct>\d{1,2}\.\d{2}) %( \((?P<fps>\d+\.\d{2}) fps, avg (?P<avg_fps>\d+\.\d{2}) fps, ETA (?P<eta>\d{2}h\d{2}m\d{2}s)\))?",
+    )
+    .expect("BUG: Failed to compile progress regex")
+});
+
+/// Parses HandBrake's `HHhMMmSSs` ETA format into a `Duration`.
+fn parse_eta(eta_str: &str) -> Duration {
+    let h_str = &eta_str[0..2];
+    let m_str = &eta_str[3..5];
+    let s_str = &eta_str[6..8];
+
+    let h = h_str.parse::<u64>().unwrap_or(0);
+    let m = m_str.parse::<u64>().unwrap_or(0);
+    let s = s_str.parse::<u64>().unwrap_or(0);
+
+    Duration::from_secs(h * 3600 + m * 60 + s)
+}
+
 pub enum InputSource {
     File(PathBuf),
     Stdin,
 }
 
+impl From<PathBuf> for InputSource {
+    fn from(p: PathBuf) -> Self {
+        InputSource::File(p)
+    }
+}
+
 pub enum OutputDestination {
     File(PathBuf),
     Stdout,
+}
+
+impl From<PathBuf> for OutputDestination {
+    fn from(p: PathBuf) -> Self {
+        OutputDestination::File(p)
+    }
 }
 
 pub struct JobBuilder {
@@ -30,7 +78,7 @@ pub struct JobBuilder {
     // Maps track number to codec string. Allows overriding specific tracks.
     audio_codecs: HashMap<u32, String>,
     quality: Option<f32>,
-    // Add other options here as needed
+    format: Option<String>,
 }
 
 impl JobBuilder {
@@ -44,6 +92,7 @@ impl JobBuilder {
             video_codec: None,
             audio_codecs: HashMap::new(),
             quality: None,
+            format: None,
         }
     }
 
@@ -58,6 +107,11 @@ impl JobBuilder {
     /// e.g., "x265", "hevc", "av1"
     pub fn video_codec(mut self, codec: impl Into<String>) -> Self {
         self.video_codec = Some(codec.into());
+        self
+    }
+
+    pub fn format(mut self, format: impl Into<String>) -> Self {
+        self.format = Some(format.into());
         self
     }
 
@@ -82,7 +136,7 @@ impl JobBuilder {
     ///
     /// # Errors
     /// Returns an error if the process could not be spawned.
-    pub async fn status(&self) -> Result<ExitStatus, Error> {
+    pub async fn status(self) -> Result<ExitStatus, Error> {
         let args = self.build_args();
 
         let stdin_cfg = match self.input {
@@ -106,6 +160,119 @@ impl JobBuilder {
             .status()
             .await
             .map_err(|e| Error::ProcessSpawnFailed { source: e })
+    }
+
+    /// Starts the job in monitored mode.
+    /// Returns a `JobHandle` to monitor and control the running process.
+    ///
+    /// # Errors
+    /// Returns an error if the process could not be spawned.
+    pub fn start(self) -> Result<JobHandle, Error> {
+        let args = self.build_args();
+
+        let stdin_cfg = match self.input {
+            InputSource::Stdin => Stdio::piped(),
+            _ => Stdio::null(),
+        };
+
+        let mut child = Command::new(&self.handbrake_path)
+            .args(args)
+            .stdin(stdin_cfg)
+            .stdout(Stdio::piped()) // always capture stdout
+            .stderr(Stdio::piped()) // Must pipe stderr for monitoring
+            .spawn()
+            .map_err(|e| Error::ProcessSpawnFailed { source: e })?;
+
+        // Channel for sending events from the background task to the main handle.
+        let (event_tx, event_rx) = mpsc::channel(128);
+
+        // We must take ownership of stderr to read from it.
+        let stderr = child
+            .stderr
+            .take()
+            .expect("BUG: stderr was not captured. This should not happen when piping.");
+
+        let stdout = child.stdout.take().expect("BUG: stdout was not captured.");
+
+        let child = Arc::new(Mutex::new(child));
+        let waiter = Arc::clone(&child);
+
+        // Spawn a background task to read from stderr and stdout and parse events.
+        tokio::spawn(async move {
+            let mut stdout_reader = BufReader::new(stdout);
+            // stderr logs are simple
+            let mut stderr_reader = FramedRead::new(stderr, LinesCodec::default());
+
+            loop {
+                let mut out_buf: Vec<u8> = Vec::new();
+                let line = select! {
+                    _ = stdout_reader.read_until(b'\r', &mut out_buf) => {
+                        // helper to parse out f32
+                        let f32_extract = |caps: &Captures, name: &str| {
+                            if let Some(v) = caps.name(name) {
+                                Some(
+                                    String::from_utf8_lossy(v.as_bytes())
+                                        .parse().unwrap_or_default(),
+                                )
+                            } else {
+                                None
+                            }
+                        };
+                        Ok(match PROGRESS_RE.captures(&out_buf) {
+                            Some(caps) => {
+                                let event = JobEvent::Progress(crate::Progress {
+                                    percentage: f32_extract(&caps, "pct").unwrap_or_default(),
+                                    fps: f32_extract(&caps, "fps").unwrap_or_default(),
+                                    avg_fps: f32_extract(&caps, "avg_fps"),
+                                    eta: if let Some(v) = caps.name("eta") {
+                                        Some(parse_eta(&String::from_utf8_lossy(v.as_bytes())))
+                                    } else {
+                                        None
+                                    },
+                                });
+                                // remove all occurrences of the progress
+                                out_buf = PROGRESS_RE.replace_all(&out_buf, b"").into();
+
+                                event
+                            },
+                            None => JobEvent::Fragment(out_buf.to_vec()),
+                        })
+                    },
+                    line = stderr_reader.next() => match line {
+                        Some(Ok(v)) => Ok(if v == "HandBrake has exited." { JobEvent::Done(Ok(())) } else { JobEvent::Log(Log { message: v }) }),
+                        Some(Err(e)) => Err(std::io::Error::new(io::ErrorKind::InvalidData, e)),
+                        None => continue,
+                    },
+                };
+
+                match line {
+                    Ok(event) => {
+                        let done = match &event {
+                            JobEvent::Done(_) => true,
+                            _ => false,
+                        };
+                        let _ = event_tx.send(event).await;
+                        // send the trailing/preceding output buffer
+                        if out_buf.len() > 0 {
+                            let _ = event_tx.send(JobEvent::Fragment(out_buf.to_vec())).await;
+                        }
+                        if done {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = event_tx
+                            .send(JobEvent::Log(Log {
+                                message: format!("Failed to read the line: {:?}", e).to_string(),
+                            }))
+                            .await;
+                    }
+                };
+            }
+            let _ = waiter.lock().await.wait().await;
+        });
+
+        Ok(JobHandle { child, event_rx })
     }
 
     /// Builds the final list of command-line arguments based on the configured options.
@@ -142,6 +309,9 @@ impl JobBuilder {
         }
         if let Some(q) = &self.quality {
             args.extend(["--quality".into(), q.to_string()]);
+        }
+        if let Some(f) = &self.format {
+            args.extend(["--format".into(), f.to_string()]);
         }
 
         args

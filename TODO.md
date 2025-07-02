@@ -40,22 +40,22 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 
 ## Chunk 5: Monitored Execution (`start` and `JobHandle`)
 - [X] Define the final event data structures in `event.rs`: `JobSummary` and `JobFailure`.
-- [ ] Implement the `JobHandle` struct in `handle.rs` (containing `Child` and the stream handle).
-- [ ] Implement the `start()` method on `JobBuilder`.
-- [ ] In `start()`, create the async-stream of `JobEvent`s.
-- [ ] In `start()`, spawn the `HandBrakeCLI` process with `stderr` piped.
-- [ ] In `start()`, spawn the background task for reading `stderr`.
-- [ ] Implement the `stderr` reader task logic.
-- [ ] In `handle.rs`, implement `events()` to yield every event of the `Stream`.
+- [X] Implement the `JobHandle` struct in `handle.rs` (containing `Child` and the stream handle).
+- [X] Implement the `start()` method on `JobBuilder`.
+- [X] In `start()`, create the async-stream of `JobEvent`s.
+- [X] In `start()`, spawn the `HandBrakeCLI` process with `stderr` piped.
+- [X] In `start()`, spawn the background task for reading `stderr`.
+- [X] Implement the `stderr` reader task logic.
+- [X] In `handle.rs`, implement `events()` to yield every event of the `Stream`.
 
 ## Chunk 6: Event Parsing & Streaming
-- [ ] Define `Config` struct and add `JobEvent::Config` variant in `event.rs` as per the spec.
-- [ ] Implement parsing logic for the initial JSON job configuration block into a `JobEvent::Config`.
-- [ ] Implement parsing logic for `Progress` events from `stderr` lines using `regex`.
-- [ ] Implement parsing logic for `Log` events from non-progress `stderr` lines.
-- [ ] In the `stderr` reader task, send parsed `Config`, `Progress`, and `Log` events over the channel.
-- [ ] In the `stderr` reader task, await the final process `ExitStatus` after the stream ends.
-- [ ] In the `stderr` reader task, send the final `JobEvent::Done` event.
+- [X] Define `Config` struct and add `JobEvent::Config` variant in `event.rs` as per the spec.
+- [X] Implement parsing logic for the JSON job configuration block into a `JobEvent::Config`.
+- [X] Implement parsing logic for `Progress` events from `stderr` lines using `regex`.
+- [X] Implement parsing logic for `Log` events from non-progress `stderr` lines.
+- [X] In the `stderr` reader task, send parsed `Config`, `Progress`, and `Log` events over the channel.
+- [X] In the `stderr` reader task, await the final process `ExitStatus` after the stream ends.
+- [X] In the `stderr` reader task, send the final `JobEvent::Done` event.
 - [ ] Create an `#[ignore]` integration test for the `start()` method to verify event parsing.
 
 ## Chunk 7: Process Control

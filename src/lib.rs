@@ -12,7 +12,7 @@ mod job;
 mod testing;
 
 #[cfg(test)]
-use testing::mock_command::{MockCommand as Command};
+use testing::mock_command::MockCommand as Command;
 
 /// Validates that the given path points to a runnable HandBrakeCLI executable.
 /// Runs `HandBrakeCLI --version` and checks the exit code.
@@ -71,9 +71,12 @@ fn find_executable_in_path(path_env: &std::ffi::OsStr) -> Result<PathBuf, Error>
 }
 
 pub use error::Error;
-pub use event::{JobEvent, JobFailure, JobSummary, Log, LogLevel, Progress};
-// pub use handle::JobHandle; // Will be re-exported later
-pub use job::{InputSource, JobBuilder, OutputDestination}; // Will be re-exported later
+pub use event::{
+    AudioConfig, AudioTrackConfig, Config, DestinationConfig, JobEvent, JobFailure, Log, Progress,
+    SourceConfig, VideoConfig,
+};
+pub use handle::JobHandle;
+pub use job::{InputSource, JobBuilder, OutputDestination};
 
 /// Represents the HandBrake executable.
 #[derive(Debug)]
@@ -117,7 +120,7 @@ impl HandBrake {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_executable, HandBrake};
+    use super::{HandBrake, validate_executable};
     use crate::testing::mock_command::{MockCommandExpect, MockResult};
     use std::path::PathBuf;
 
@@ -142,7 +145,9 @@ mod tests {
             .returns(MockResult::failure(1).with_stderr(b"Error: Something went wrong\n"));
 
         let err = validate_executable(&test_path).await.unwrap_err();
-        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("command failed with exit code")));
+        assert!(
+            matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("command failed with exit code"))
+        );
     }
 
     #[tokio::test]
@@ -154,7 +159,9 @@ mod tests {
             .returns(MockResult::success().with_stdout(b"")); // Empty stdout
 
         let err = validate_executable(&test_path).await.unwrap_err();
-        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("returned empty output")));
+        assert!(
+            matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("returned empty output"))
+        );
     }
 
     #[tokio::test]
@@ -166,7 +173,9 @@ mod tests {
             .returns(MockResult::success().with_stdout(vec![0xC3, 0x28])); // Invalid UTF-8 sequence
 
         let err = validate_executable(&test_path).await.unwrap_err();
-        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("Failed to parse version output as UTF-8")));
+        assert!(
+            matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("Failed to parse version output as UTF-8"))
+        );
     }
 
     #[tokio::test]
@@ -191,6 +200,8 @@ mod tests {
             .returns(MockResult::failure(127).with_stderr(b"command not found\n"));
 
         let err = HandBrake::new_with_path(&test_path).await.unwrap_err();
-        assert!(matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("command failed with exit code")));
+        assert!(
+            matches!(err, super::Error::InvalidExecutable { path, reason } if path == test_path && reason.contains("command failed with exit code"))
+        );
     }
 }
