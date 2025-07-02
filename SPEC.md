@@ -107,7 +107,15 @@ impl JobBuilder {
     /// Overrides the audio codec for a specific track.
     pub fn audio_codec(self, track: u32, codec: impl Into<String>) -> Self { /* ... */ }
 
-    // ... other fluent methods for quality, filters, etc.
+    /// Sets the constant quality (RF) for video encoding.
+    /// Value typically ranges from 0 to 51 (lower is better quality).
+    pub fn quality(self, quality: f32) -> Self { /* ... */ }
+
+    /// Sets the output container format.
+    /// e.g., "mp4", "mkv"
+    pub fn format(self, format: impl Into<String>) -> Self { /* ... */ }
+
+    // ... other fluent methods for filters, etc.
 
     /// Executes the job and waits for completion, returning only the final status.
     /// Ideal for "fire-and-forget" scenarios.
@@ -129,6 +137,7 @@ impl JobBuilder {
 
 ```rust
 use futures::stream::Stream;
+use std::time::Duration;
 
 pub struct JobHandle {
     // handle to the child process
@@ -152,41 +161,27 @@ impl JobHandle {
 
 #[derive(Debug)]
 pub enum JobEvent {
-    Config(Config),
+    /// Raw, unparsed data from the output stream, typically from `stdout`.
+    /// This can contain interleaved video data if streaming to `stdout`.
+    Fragment(Vec<u8>),
+    /// A progress update from the encoding process.
     Progress(Progress),
+    /// A log message from `HandBrakeCLI`.
     Log(Log),
-    Done(Result<JobSummary, JobFailure>),
+    /// Signals that the `HandBrakeCLI` process has finished.
+    Done,
 }
 
 #[derive(Debug)]
 pub struct Progress {
     pub percentage: f32,
     pub fps: f32,
-    pub eta: Duration,
+    pub avg_fps: Option<f32>,
+    pub eta: Option<Duration>,
 }
 
 #[derive(Debug)]
 pub struct Log {
-    pub level: LogLevel,
-    pub message: String,
-}
-
-#[derive(Debug)]
-pub enum LogLevel {
-    Info,
-    Warning,
-    Error,
-}
-
-#[derive(Debug)]
-pub struct JobSummary {
-    pub duration: std::time::Duration,
-    pub avg_fps: f32,
-}
-
-#[derive(Debug)]
-pub struct JobFailure {
-    pub exit_code: Option<i32>,
     pub message: String,
 }
 ```
@@ -195,14 +190,14 @@ pub struct JobFailure {
 
 The implementation must correctly handle the `stdout` and `stderr` streams from the `HandBrakeCLI` child process.
 
-* **`stdout`**: If the `OutputDestination` is `Stdout`, the raw video data from the child process's `stdout` must be piped directly to the parent process's `stdout` without modification. `HandBrakeCLI` writes all progress information to `stdout`.
-* **`stderr`**: While the log information to `stderr`.A dedicated asynchronous task must read `stderr` and `stdout` line by line. Some lines will end with `\n`, while the progress lines use `\r`.
-* **Parsing Logic**:
-    * Each line from `stderr` must be parsed to determine its type. Regular expressions (`regex` crate) are recommended for this.
-    * **JSON Job**: `HandBrakeCLI` will print as multiline JSON string the entire job configuration that should be correctly parsed into `JobConfig` struct.
-    * **Progress Lines**: Lines matching a pattern like `Encoding: task ..., XX.XX %, ...` should be parsed into a `Progress` struct.
-    * **Log Lines**: Non-progress lines should be categorized. Lines starting with "ERROR:" map to `LogLevel::Error`. Lines with "Warning:" map to `LogLevel::Warning`. All other lines can be treated as `LogLevel::Info`.
-    * **Completion**: When the `stderr` stream closes and the process exits, a final `Done` event must be sent. The content of this event depends on the process's exit code. A zero exit code signifies success.
+*   **`stdout`**: `HandBrakeCLI` writes progress information and, if `OutputDestination` is `Stdout`, raw video data to this stream.
+*   **`stderr`**: `HandBrakeCLI` writes all log messages to this stream.
+*   **Parsing Logic**: A dedicated asynchronous task must read both `stdout` and `stderr`.
+    *   **Progress Lines**: `stdout` is read in chunks, looking for lines matching a pattern like `Encoding: task ..., XX.XX %, ...`. These are parsed into a `Progress` struct.
+    *   **Log Lines**: Each line from `stderr` is treated as a `Log` event.
+    *   **Raw Data**: Any data from `stdout` that is not a progress line is emitted as a `Fragment` event. This is important for streaming scenarios.
+    *   **JSON Job**: The specification requires that `HandBrakeCLI` will print a multiline JSON string with the entire job configuration. This should be parsed into a `JobConfig` struct. (Note: This is a future requirement not yet fully implemented).
+    *   **Completion**: When `HandBrakeCLI` prints that it has exited, a final `Done` event must be sent.
 
 ### **6. Error Handling Strategy**
 
