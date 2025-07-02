@@ -15,6 +15,11 @@ pub enum Error {
     ProcessSpawnFailed {
         source: std::io::Error,
     },
+    #[error("Failed to send {action} to HandBrake process, due to {source}")]
+    ControlFailed {
+        action: &'static str,
+        source: std::io::Error,
+    },
     // Placeholder for other errors
     #[error("An unknown error occurred")]
     Unknown,

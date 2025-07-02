@@ -2,10 +2,11 @@ use crate::error::Error;
 use crate::event::JobEvent;
 use async_stream::stream;
 use futures::Stream;
+use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::process::Child;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 /// Represents a running HandBrake job, providing access to events and process control.
 #[derive(Debug)]
@@ -20,15 +21,37 @@ impl JobHandle {
     /// Attempts to gracefully shut down the HandBrake process.
     /// (Sends SIGINT on Unix, CTRL_C_EVENT on Windows).
     pub async fn cancel(&self) -> Result<(), Error> {
-        // To be implemented in Chunk 7
-        unimplemented!("Graceful cancellation is not yet implemented.");
+        let child = self.child.lock().await;
+        let pid = child.id().ok_or(Error::ControlFailed {
+            action: "cancel",
+            source: io::Error::new(io::ErrorKind::NotFound, "Process already exited"),
+        })?;
+
+        #[cfg(unix)]
+        {
+            use nix::sys::signal::{self, Signal};
+            use nix::unistd::Pid;
+            match signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(Error::ControlFailed {
+                    action: "cancel",
+                    source: io::Error::new(
+                        io::ErrorKind::Unsupported,
+                        format!("Failed with errno: {e}"),
+                    ),
+                }),
+            }
+        }
     }
 
     /// Forcefully terminates the HandBrake process immediately.
     /// (Sends SIGKILL on Unix, TerminateProcess on Windows).
-    pub async fn kill(&mut self) -> Result<(), Error> {
-        // To be implemented in Chunk 7
-        unimplemented!("Killing the process is not yet implemented.");
+    pub async fn kill(&self) -> Result<(), Error> {
+        let mut child = self.child.lock().await;
+        child.kill().await.map_err(|e| Error::ControlFailed {
+            action: "kill",
+            source: e,
+        })
     }
 
     /// Returns an async stream of events from the running job.

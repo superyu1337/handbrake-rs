@@ -61,9 +61,9 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [ ] Create an `#[ignore]` integration test for the `start()` method to verify event parsing.
 
 ## Chunk 7: Process Control
-- [ ] Implement `JobHandle::kill()` to terminate the process.
-- [ ] Implement `JobHandle::cancel()` for graceful shutdown (`SIGINT`/`CTRL_C_EVENT`).
-- [ ] Use `#[cfg(unix)]` and `#[cfg(windows)]` for platform-specific cancellation logic.
+- [X] Implement `JobHandle::kill()` to terminate the process.
+- [X] Implement `JobHandle::cancel()` for graceful shutdown (`SIGINT`/`CTRL_C_EVENT`).
+- [/] Use `#[cfg(unix)]` and `#[cfg(windows)]` for platform-specific cancellation logic.
 - [ ] Create an `#[ignore]` integration test for `kill()`.
 - [_] Create an `#[ignore]` integration test for `cancel()`.
 
