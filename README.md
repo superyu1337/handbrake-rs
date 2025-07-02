@@ -6,9 +6,14 @@ It allows Rust applications to programmatically start, configure, monitor, and c
 
 ## Features
 
-- **Fluent Job Configuration**: Use a builder pattern to easily configure encoding jobs (e.g., `job.preset("Fast 1080p30").video_codec("x265")`).
+- **Fluent Job Configuration**: Use a builder pattern to easily configure encoding jobs (e.g., `job.preset("Fast 1080p30").quality(22.0)`).
 - **Asynchronous API**: Built on `tokio`, the entire API is `async`, making it suitable for modern, high-performance applications.
-- **Real-time Monitoring**: Subscribe to a stream of structured events for progress updates, logs, and job completion notifications.
+- **Real-time Monitoring**: Subscribe to a stream of structured events:
+    - `Config`: The full job configuration, parsed from HandBrake's JSON output.
+    - `Progress`: Real-time updates on percentage, FPS, and ETA.
+    - `Log`: Raw log messages from `HandBrakeCLI`.
+    - `Fragment`: Raw `stdout` data, useful when piping video output.
+    - `Done`: Signals the completion (success or failure) of the job.
 - **Two Execution Modes**:
     - **Monitored**: Get a `JobHandle` to receive live events and control the process.
     - **Fire-and-Forget**: Simply execute a job and wait for its final exit status.
@@ -29,7 +34,7 @@ futures = "0.3"
 Here is a basic example of how to start and monitor an encoding job.
 
 ```rust
-use handbrake_rs::{HandBrake, JobEvent, LogLevel};
+use handbrake_rs::{HandBrake, JobEvent};
 use futures::StreamExt;
 use std::path::PathBuf;
 
@@ -45,28 +50,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut job_handle = hb
         .job(input.into(), output.into())
         .preset("Fast 1080p30")
-        .video_codec("x265")
+        .quality(22.0) // Set the quality
         .start()?; // Start in monitored mode
 
     // Listen for events
     while let Some(event) = job_handle.events().next().await {
         match event {
+            JobEvent::Config(config) => {
+                println!("[HandBrake] Job Config Received: {:#?}", config);
+            }
             JobEvent::Progress(p) => {
+                let eta = p.eta.map(|d| format!("{:?}", d)).unwrap_or_else(|| "N/A".to_string());
                 println!(
                     "Encoding: {:.2}% complete, FPS: {:.2}, ETA: {}",
-                    p.percentage, p.fps, p.eta
+                    p.percentage, p.fps, eta
                 );
             }
             JobEvent::Log(log) => {
-                if log.level == LogLevel::Error {
-                    eprintln!("[HandBrake Log] ERROR: {}", log.message);
-                } else {
-                    println!("[HandBrake Log] {}", log.message);
-                }
+                println!("[HandBrake Log] {}", log.message);
             }
-            JobEvent::Done(result) => match result {
-                Ok(summary) => println!("Done! Encoding took {:?}", summary.total_time),
-                Err(failure) => eprintln!("Encoding failed: {}", failure.final_error_message),
+            JobEvent::Fragment(data) => {
+                // This event contains raw data from stdout that isn't progress info.
+                // If you are piping the output to stdout, this will contain the video data.
+                println!("[HandBrake] Received {} bytes of raw data.", data.len());
+            }
+            JobEvent::Done(result) => {
+                match result {
+                    Ok(()) => println!("Done! Encoding finished successfully."),
+                    Err(failure) => eprintln!("Encoding failed: {}", failure.message),
+                }
+                break; // Exit the loop
             },
         }
     }
@@ -83,4 +96,4 @@ The crate is designed around three main components:
 2.  **`JobBuilder`**: A fluent interface to define all the parameters for a specific encoding job.
 3.  **`JobHandle`**: Returned when a job is started in monitored mode. It represents the running process and gives you access to the event stream and control methods like `cancel()` and `kill()`.
 
-This crate works by spawning `HandBrakeCLI` as a child process and parsing its `stderr` output in real-time to generate a structured stream of `JobEvent`s.
+This crate works by spawning `HandBrakeCLI` as a child process and parsing its `stdout` and `stderr` streams in real-time. It parses progress indicators from `stdout`, and JSON configuration and logs from `stderr`, to generate a structured stream of `JobEvent`s.
