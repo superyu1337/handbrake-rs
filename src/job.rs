@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::Stdio;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -40,6 +41,18 @@ fn parse_eta(eta_str: &str) -> Duration {
     let s = s_str.parse::<u64>().unwrap_or(0);
 
     Duration::from_secs(h * 3600 + m * 60 + s)
+}
+
+fn parse_caps<T>(caps: &Captures, name: &str) -> Option<T> where T: Default + FromStr {
+    if let Some(v) = caps.name(name) {
+        Some(
+            String::from_utf8_lossy(v.as_bytes())
+                .parse::<T>()
+                .unwrap_or_default(),
+        )
+    } else {
+        None
+    }
 }
 
 pub enum InputSource {
@@ -209,32 +222,27 @@ impl JobBuilder {
             #[derive(PartialEq)]
             enum EventStreamState {
                 Active,
-                Done,
+                Eof,
             }
 
             let mut event_parsing_state = EventStreamState::Active;
 
-            loop {
+            while event_parsing_state == EventStreamState::Active {
                 let mut out_buf: Vec<u8> = Vec::new();
                 let line = select! {
-                    _ = stdout_reader.read_until(b'\r', &mut out_buf) => {
-                        // helper to parse out f32
-                        let f32_extract = |caps: &Captures, name: &str| {
-                            if let Some(v) = caps.name(name) {
-                                Some(
-                                    String::from_utf8_lossy(v.as_bytes())
-                                        .parse().unwrap_or_default(),
-                                )
-                            } else {
-                                None
+                    read_status = stdout_reader.read_until(b'\r', &mut out_buf) => {
+                        // propagate the error
+                        if let Ok(bytes_read) = read_status {
+                            if bytes_read == 0 {
+                                event_parsing_state = EventStreamState::Eof;
                             }
-                        };
+                        }
                         Ok(match PROGRESS_RE.captures(&out_buf) {
                             Some(caps) => {
                                 let event = JobEvent::Progress(crate::Progress {
-                                    percentage: f32_extract(&caps, "pct").unwrap_or_default(),
-                                    fps: f32_extract(&caps, "fps").unwrap_or_default(),
-                                    avg_fps: f32_extract(&caps, "avg_fps"),
+                                    percentage: parse_caps(&caps, "pct").unwrap_or_default(),
+                                    fps: parse_caps(&caps, "fps").unwrap_or_default(),
+                                    avg_fps: parse_caps(&caps, "avg_fps"),
                                     eta: if let Some(v) = caps.name("eta") {
                                         Some(parse_eta(&String::from_utf8_lossy(v.as_bytes())))
                                     } else {
@@ -269,7 +277,7 @@ impl JobBuilder {
                                     continue; // Continue buffering
                                 }
                             } else {
-                                Ok(if v == "HandBrake has exited." { event_parsing_state = EventStreamState::Done; break } else { JobEvent::Log(Log { message: v }) })
+                                Ok(JobEvent::Log(Log { message: v }))
                             }
                         },
                         Some(Err(e)) => Err(std::io::Error::new(io::ErrorKind::InvalidData, e)),
@@ -284,9 +292,6 @@ impl JobBuilder {
                         if out_buf.len() > 0 {
                             let _ = event_tx.send(JobEvent::Fragment(out_buf.to_vec())).await;
                         }
-                        if event_parsing_state == EventStreamState::Done {
-                            break;
-                        }
                     }
                     Err(e) => {
                         let _ = event_tx
@@ -299,10 +304,14 @@ impl JobBuilder {
             }
             match waiter.lock().await.wait().await {
                 Ok(status) => event_tx.send(JobEvent::Done(Ok(status))).await,
-                Err(e) => event_tx.send(JobEvent::Done(Err(crate::JobFailure {
-                    message: format!("Failed: {}", e),
-                    exit_code: e.raw_os_error(),
-                }))).await,
+                Err(e) => {
+                    event_tx
+                        .send(JobEvent::Done(Err(crate::JobFailure {
+                            message: format!("Failed: {}", e),
+                            exit_code: e.raw_os_error(),
+                        })))
+                        .await
+                }
             }
         });
 
