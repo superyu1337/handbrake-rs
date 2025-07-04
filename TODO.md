@@ -58,14 +58,14 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [/] In the `stderr` reader task, send parsed `Config`, `Progress`, and `Log` events over the channel.
 - [X] In the `stderr` reader task, await the final process `ExitStatus` after the stream ends.
 - [X] In the `stderr` reader task, send the final `JobEvent::Done` event.
-- [ ] Create an `#[ignore]` integration test for the `start()` method to verify event parsing.
+- [X] Create an `#[ignore]` integration test for the `start()` method to verify event parsing.
 
 ## Chunk 7: Process Control
 - [X] Implement `JobHandle::kill()` to terminate the process.
 - [X] Implement `JobHandle::cancel()` for graceful shutdown (`SIGINT`/`CTRL_C_EVENT`).
-- [/] Use `#[cfg(unix)]` and `#[cfg(windows)]` for platform-specific cancellation logic.
-- [ ] Create an `#[ignore]` integration test for `kill()`.
-- [_] Create an `#[ignore]` integration test for `cancel()`.
+- [X] Use `#[cfg(unix)]` and `#[cfg(windows)]` for platform-specific cancellation logic.
+- [X] Create an `#[ignore]` integration test for `kill()`.
+- [X] Create an `#[ignore]` integration test for `cancel()`.
 
 ## Chunk 8: Finalization & Documentation
 - [ ] Add comprehensive `rustdoc` comments to all public APIs.
