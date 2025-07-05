@@ -72,7 +72,7 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Include `# Examples` in documentation for key functions.
 - [X] Create a high-quality `README.md` file with installation and usage examples.
 - [X] Review and polish all unit and integration tests.
-- [ ] Ensure integration tests are properly marked `#[ignore]`.
-- [ ] Prepare `Cargo.toml` for publishing (license, repository, etc.).
-- [ ] Run `cargo publish --dry-run` to check for issues.
-- [ ] Publish the crate to `crates.io`.
+- [X] Ensure integration tests are properly marked `#[ignore]`.
+- [X] Prepare `Cargo.toml` for publishing (license, repository, etc.).
+- [X] Run `cargo publish --dry-run` to check for issues.
+- [X] Publish the crate to `crates.io`.
