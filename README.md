@@ -1,3 +1,5 @@
+[![Rust](https://github.com/reliq-hq/handbrake-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/reliq-hq/handbrake-rs/actions/workflows/rust.yml)
+
 # handbrake-rs
 
 `handbrake-rs` is a Rust crate that provides a safe, ergonomic, and asynchronous interface for controlling the `HandBrakeCLI` video transcoder.
