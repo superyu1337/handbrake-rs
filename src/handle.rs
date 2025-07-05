@@ -80,7 +80,7 @@ impl JobHandle {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use handbrake_rs::{HandBrake, JobEvent, InputSource, OutputDestination};
+    /// # use handbrake::{HandBrake, JobEvent, InputSource, OutputDestination};
     /// # use futures::StreamExt;
     /// # use std::path::PathBuf;
     /// # #[tokio::main]

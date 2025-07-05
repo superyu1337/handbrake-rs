@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use futures::StreamExt;
-use handbrake_rs::{HandBrake, InputSource, JobEvent, OutputDestination};
+use handbrake::{HandBrake, InputSource, JobEvent, OutputDestination};
 use tracing::{error, info};
 
 #[tokio::main]

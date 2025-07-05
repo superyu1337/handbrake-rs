@@ -1,4 +1,4 @@
-use handbrake_rs::{HandBrake, JobEvent};
+use handbrake::{HandBrake, JobEvent};
 use futures::StreamExt;
 use std::path::PathBuf;
 use std::time::Duration;

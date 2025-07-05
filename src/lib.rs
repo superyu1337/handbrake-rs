@@ -1,38 +1,38 @@
 //! A safe, ergonomic, and asynchronous Rust crate for controlling the `HandBrakeCLI` video transcoder.
-//! 
+//!
 //! `handbrake-rs` allows Rust applications to programmatically start, configure, monitor, and control
 //! HandBrake encoding jobs without needing to manually handle command-line arguments or parse raw text output.
-//! 
+//!
 //! # Features
-//! 
+//!
 //! - **Fluent Job Configuration**: Use a builder pattern to easily configure encoding jobs.
 //! - **Asynchronous API**: Built on `tokio`, the entire API is `async`.
 //! - **Real-time Monitoring**: Subscribe to a stream of structured events for progress, logs, and job completion.
 //! - **Process Control**: Gracefully `cancel()` or forcefully `kill()` a running encoding job.
 //! - **Flexible Setup**: Automatically finds `HandBrakeCLI` in the system `PATH` or allows specifying a direct path.
-//! 
+//!
 //! # Quick Start
-//! 
+//!
 //! ```rust,no_run
-//! use handbrake_rs::{HandBrake, JobEvent};
+//! use handbrake::{HandBrake, JobEvent};
 //! use futures::StreamExt;
 //! use std::path::PathBuf;
-//! 
+//!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Find HandBrakeCLI in the system PATH
 //!     let hb = HandBrake::new().await?;
-//! 
+//!
 //!     let input = PathBuf::from("path/to/your/video.mkv");
 //!     let output = PathBuf::from("path/to/your/output.mp4");
-//! 
+//!
 //!     // Configure and start the encoding job
 //!     let mut job_handle = hb
 //!         .job(input.into(), output.into())
 //!         .preset("Fast 1080p30")
 //!         .quality(22.0)
 //!         .start()?;
-//! 
+//!
 //!     // Listen for events
 //!     while let Some(event) = job_handle.events().next().await {
 //!         match event {
@@ -50,7 +50,7 @@
 //!             _ => {}
 //!         }
 //!     }
-//! 
+//!
 //!     Ok(())
 //! }
 //! ```

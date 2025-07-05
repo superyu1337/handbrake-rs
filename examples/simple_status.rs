@@ -1,4 +1,4 @@
-use handbrake_rs::{HandBrake, InputSource, OutputDestination};
+use handbrake::{HandBrake, InputSource, OutputDestination};
 use std::path::PathBuf;
 
 #[tokio::main]

@@ -1,4 +1,4 @@
-use handbrake_rs::{InputSource, JobBuilder, OutputDestination};
+use handbrake::{InputSource, JobBuilder, OutputDestination};
 use std::path::PathBuf;
 
 #[test]

@@ -1,4 +1,4 @@
-use handbrake_rs::HandBrake;
+use handbrake::HandBrake;
 
 #[tokio::main]
 async fn main() {
