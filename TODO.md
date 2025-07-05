@@ -1,6 +1,6 @@
-# `handbrake-rs` Implementation Checklist
+# `handbrake` Implementation Checklist
 
-This document outlines the development tasks for building the `handbrake-rs` crate. Check off items as they are completed.
+This document outlines the development tasks for building the `handbrake` crate. Check off items as they are completed.
 
 ## Chunk 1: Project Setup & Core Types
 - [X] Initialize `cargo` project.
@@ -76,3 +76,24 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Prepare `Cargo.toml` for publishing (license, repository, etc.).
 - [X] Run `cargo publish --dry-run` to check for issues.
 - [X] Publish the crate to `crates.io`.
+
+## Chunk 9: Subtitles
+- [ ] Implement subtitle track selection in `JobBuilder`.
+- [ ] Implement subtitle import from external files (`--subtitle-import`).
+- [ ] Implement subtitle burn-in (`--subtitle-burned`).
+- [ ] Implement foreign audio scan for subtitles (`--subtitle-scan`).
+
+## Chunk 10: Advanced Video Filters
+- [ ] Add a generic `.filter()` method to `JobBuilder` for custom filter strings.
+- [ ] Add specific filter methods like `.deinterlace()`, `.denoise()`, `.detelecine()`, etc.
+- [ ] Add support for filter-specific options (e.g., `deinterlace="bob"`).
+
+## Chunk 11: Advanced Audio Control
+- [ ] Implement audio track selection by index or language in `JobBuilder`.
+- [ ] Implement support for multiple audio tracks.
+- [ ] Implement foreign audio search for audio tracks.
+
+## Chunk 12: Other Features
+- [ ] Implement chapter marker support.
+- [ ] Implement preset validation and listing.
+- [ ] Implement job queueing functionality within `handbrake-rs`.
