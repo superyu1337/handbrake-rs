@@ -209,6 +209,51 @@ fn test_job_builder_last_call_wins_audio_codec_same_track() {
 }
 
 #[test]
+fn test_job_builder_last_call_wins_quality_float() {
+    let handbrake_path = PathBuf::from("/usr/bin/HandBrakeCLI");
+    let input = InputSource::File(PathBuf::from("input.mkv"));
+    let output = OutputDestination::File(PathBuf::from("output.mp4"));
+
+    let builder = JobBuilder::new(handbrake_path, input, output)
+        .quality(25.0)
+        .quality(18.5); // 18.5 should override
+
+    let args = builder.build_args();
+
+    assert_eq!(
+        args,
+        vec![
+            "-i",
+            "input.mkv",
+            "-o",
+            "output.mp4",
+            "--quality",
+            "18.5",
+        ]
+    );
+}
+
+#[test]
+fn test_job_builder_path_with_spaces() {
+    let handbrake_path = PathBuf::from("/usr/bin/HandBrakeCLI");
+    let input = InputSource::File(PathBuf::from("/path with spaces/to/input.mkv"));
+    let output = OutputDestination::File(PathBuf::from("/path with spaces/to/output.mp4"));
+
+    let builder = JobBuilder::new(handbrake_path, input, output);
+    let args = builder.build_args();
+
+    assert_eq!(
+        args,
+        vec![
+            "-i",
+            "/path with spaces/to/input.mkv",
+            "-o",
+            "/path with spaces/to/output.mp4",
+        ]
+    );
+}
+
+#[test]
 fn test_job_builder_combined_options() {
     let handbrake_path = PathBuf::from("/usr/bin/HandBrakeCLI");
     let input = InputSource::File(PathBuf::from("input.mkv"));

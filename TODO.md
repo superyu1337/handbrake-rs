@@ -70,8 +70,8 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 ## Chunk 8: Finalization & Documentation
 - [X] Add comprehensive `rustdoc` comments to all public APIs.
 - [X] Include `# Examples` in documentation for key functions.
-- [ ] Create a high-quality `README.md` file with installation and usage examples.
-- [ ] Review and polish all unit and integration tests.
+- [X] Create a high-quality `README.md` file with installation and usage examples.
+- [X] Review and polish all unit and integration tests.
 - [ ] Ensure integration tests are properly marked `#[ignore]`.
 - [ ] Prepare `Cargo.toml` for publishing (license, repository, etc.).
 - [ ] Run `cargo publish --dry-run` to check for issues.

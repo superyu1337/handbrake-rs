@@ -1,11 +1,11 @@
-## **Developer Specification: `handbrake-rs` Rust Crate**
+## **Developer Specification: `handbrake` Rust Crate**
 
 **Version:** 1.0
 **Date:** 16 June 2025
 
 ### **1. Introduction & Project Goal**
 
-This document outlines the complete specification for `handbrake-rs`, a Rust crate designed to provide a safe, ergonomic, and robust interface for the `HandBrakeCLI` command-line video transcoding tool.
+This document outlines the complete specification for `handbrake`, a Rust crate designed to provide a safe, ergonomic, and robust interface for the `HandBrakeCLI` command-line video transcoding tool.
 
 The primary goal is to allow Rust applications to programmatically start, configure, monitor, and control HandBrake encoding jobs without needing to manually handle command-line arguments or parse raw text output. The crate will feature a modern, asynchronous API suitable for integration into complex applications.
 
