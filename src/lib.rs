@@ -1,3 +1,60 @@
+//! A safe, ergonomic, and asynchronous Rust crate for controlling the `HandBrakeCLI` video transcoder.
+//! 
+//! `handbrake-rs` allows Rust applications to programmatically start, configure, monitor, and control
+//! HandBrake encoding jobs without needing to manually handle command-line arguments or parse raw text output.
+//! 
+//! # Features
+//! 
+//! - **Fluent Job Configuration**: Use a builder pattern to easily configure encoding jobs.
+//! - **Asynchronous API**: Built on `tokio`, the entire API is `async`.
+//! - **Real-time Monitoring**: Subscribe to a stream of structured events for progress, logs, and job completion.
+//! - **Process Control**: Gracefully `cancel()` or forcefully `kill()` a running encoding job.
+//! - **Flexible Setup**: Automatically finds `HandBrakeCLI` in the system `PATH` or allows specifying a direct path.
+//! 
+//! # Quick Start
+//! 
+//! ```rust,no_run
+//! use handbrake_rs::{HandBrake, JobEvent};
+//! use futures::StreamExt;
+//! use std::path::PathBuf;
+//! 
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Find HandBrakeCLI in the system PATH
+//!     let hb = HandBrake::new().await?;
+//! 
+//!     let input = PathBuf::from("path/to/your/video.mkv");
+//!     let output = PathBuf::from("path/to/your/output.mp4");
+//! 
+//!     // Configure and start the encoding job
+//!     let mut job_handle = hb
+//!         .job(input.into(), output.into())
+//!         .preset("Fast 1080p30")
+//!         .quality(22.0)
+//!         .start()?;
+//! 
+//!     // Listen for events
+//!     while let Some(event) = job_handle.events().next().await {
+//!         match event {
+//!             JobEvent::Progress(p) => {
+//!                 println!("Encoding: {:.2}% complete", p.percentage);
+//!             }
+//!             JobEvent::Done(result) => {
+//!                 if result.is_ok() {
+//!                     println!("Done!");
+//!                 } else {
+//!                     eprintln!("Encoding failed.");
+//!                 }
+//!                 break;
+//!             }
+//!             _ => {}
+//!         }
+//!     }
+//! 
+//!     Ok(())
+//! }
+//! ```
+
 use std::env;
 use std::path::PathBuf;
 #[cfg(not(test))]
@@ -78,7 +135,10 @@ pub use event::{
 pub use handle::JobHandle;
 pub use job::{InputSource, JobBuilder, OutputDestination};
 
-/// Represents the HandBrake executable.
+/// The main entry point for the `handbrake-rs` crate.
+///
+/// This struct is responsible for locating and validating the `HandBrakeCLI` executable.
+/// It acts as a factory for creating new `JobBuilder` instances.
 #[derive(Debug)]
 pub struct HandBrake {
     executable_path: PathBuf,
@@ -86,7 +146,13 @@ pub struct HandBrake {
 }
 
 impl HandBrake {
-    /// Discovers the HandBrake executable in the system PATH.
+    /// Creates a new `HandBrake` instance by searching for `HandBrakeCLI` in the system `PATH`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Error` if `HandBrakeCLI` is not found in any of the directories listed
+    /// in the `PATH` environment variable, or if the found executable is invalid (e.g., fails to
+    /// return a version string).
     pub async fn new() -> Result<Self, Error> {
         let path_var = env::var_os("PATH").expect("PATH environment variable not set");
         let executable_path = find_executable_in_path(&path_var)?;
@@ -97,7 +163,12 @@ impl HandBrake {
         })
     }
 
-    /// Creates a new HandBrake instance with a specific executable path.
+    /// Creates a new `HandBrake` instance using a specific path to `HandBrakeCLI`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Error` if the file at the given path does not exist, is not executable,
+    /// or is an unsupported version of `HandBrakeCLI`.
     pub async fn new_with_path(path: impl Into<PathBuf>) -> Result<Self, Error> {
         let executable_path = path.into();
         let version = validate_executable(&executable_path).await?;
@@ -107,12 +178,19 @@ impl HandBrake {
         })
     }
 
-    /// Returns the version string of the HandBrakeCLI executable.
+    /// Returns the version string of the discovered `HandBrakeCLI` executable.
+    ///
+    /// The version is obtained by running `HandBrakeCLI --version` during initialization.
     pub fn version(&self) -> &str {
         &self.version
     }
 
-    /// Starts building a new HandBrake job.
+    /// Creates a new `JobBuilder` to configure an encoding job.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The source for the encoding job (e.g., a file path or stdin).
+    /// * `output` - The destination for the encoded file (e.g., a file path or stdout).
     pub fn job(&self, input: InputSource, output: OutputDestination) -> JobBuilder {
         JobBuilder::new(self.executable_path.clone(), input, output)
     }

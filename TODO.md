@@ -68,8 +68,8 @@ This document outlines the development tasks for building the `handbrake-rs` cra
 - [X] Create an `#[ignore]` integration test for `cancel()`.
 
 ## Chunk 8: Finalization & Documentation
-- [ ] Add comprehensive `rustdoc` comments to all public APIs.
-- [ ] Include `# Examples` in documentation for key functions.
+- [X] Add comprehensive `rustdoc` comments to all public APIs.
+- [X] Include `# Examples` in documentation for key functions.
 - [ ] Create a high-quality `README.md` file with installation and usage examples.
 - [ ] Review and polish all unit and integration tests.
 - [ ] Ensure integration tests are properly marked `#[ignore]`.

@@ -55,8 +55,11 @@ fn parse_caps<T>(caps: &Captures, name: &str) -> Option<T> where T: Default + Fr
     }
 }
 
+/// Represents the input source for a `HandBrakeCLI` job.
 pub enum InputSource {
+    /// Use a file as the input source.
     File(PathBuf),
+    /// Use `stdin` as the input source.
     Stdin,
 }
 
@@ -66,8 +69,11 @@ impl From<PathBuf> for InputSource {
     }
 }
 
+/// Represents the output destination for a `HandBrakeCLI` job.
 pub enum OutputDestination {
+    /// Write the output to a file.
     File(PathBuf),
+    /// Write the output to `stdout`.
     Stdout,
 }
 
@@ -77,6 +83,7 @@ impl From<PathBuf> for OutputDestination {
     }
 }
 
+/// A fluent builder for configuring a `HandBrakeCLI` encoding job.
 pub struct JobBuilder {
     // The path to the HandBrakeCLI executable, copied from HandBrake instance
     handbrake_path: PathBuf,
@@ -96,6 +103,8 @@ pub struct JobBuilder {
 
 impl JobBuilder {
     /// Creates a new `JobBuilder` instance.
+    ///
+    /// This is typically called via `HandBrake::job()`.
     pub fn new(handbrake_path: PathBuf, input: InputSource, output: OutputDestination) -> Self {
         JobBuilder {
             handbrake_path,
@@ -109,27 +118,33 @@ impl JobBuilder {
         }
     }
 
-    /// Sets the HandBrake preset.
-    /// e.g., "Fast 1080p30"
+    /// Sets the `HandBrakeCLI` preset.
+    ///
+    /// e.g., `"Fast 1080p30"`
     pub fn preset(mut self, preset: impl Into<String>) -> Self {
         self.preset = Some(preset.into());
         self
     }
 
     /// Overrides the video codec.
-    /// e.g., "x265", "hevc", "av1"
+    ///
+    /// e.g., `"x265"`, `"hevc"`, `"av1"`
     pub fn video_codec(mut self, codec: impl Into<String>) -> Self {
         self.video_codec = Some(codec.into());
         self
     }
 
+    /// Sets the output container format.
+    ///
+    /// e.g., `"mp4"`, `"mkv"`
     pub fn format(mut self, format: impl Into<String>) -> Self {
         self.format = Some(format.into());
         self
     }
 
     /// Overrides the audio codec for a specific track.
-    /// HandBrakeCLI uses `--audio <track_id>,<encoder>`.
+    ///
+    /// `HandBrakeCLI` uses `--audio <track_id>,<encoder>`.
     /// If called multiple times for the same track, the last call wins.
     pub fn audio_codec(mut self, track: u32, codec: impl Into<String>) -> Self {
         self.audio_codecs.insert(track, codec.into());
@@ -137,18 +152,22 @@ impl JobBuilder {
     }
 
     /// Sets the constant quality (RF) for video encoding.
-    /// HandBrakeCLI uses `--quality <value>` or `-q <value>`.
+    ///
+    /// `HandBrakeCLI` uses `--quality <value>` or `-q <value>`.
     /// Value typically ranges from 0 to 51 (lower is better quality).
     pub fn quality(mut self, quality: f32) -> Self {
         self.quality = Some(quality);
         self
     }
 
-    /// Executes the job and waits for completion, returning only the final status.
-    /// Ideal for "fire-and-forget" scenarios.
+    /// Executes the job and waits for completion, returning only the final `ExitStatus`.
+    ///
+    /// This is ideal for "fire-and-forget" scenarios where real-time monitoring is not needed.
+    /// The `stdout` and `stderr` of the child process are inherited by the parent.
     ///
     /// # Errors
-    /// Returns an error if the process could not be spawned.
+    ///
+    /// Returns an `Error` if the process could not be spawned.
     pub async fn status(self) -> Result<ExitStatus, Error> {
         let args = self.build_args();
 
@@ -175,11 +194,14 @@ impl JobBuilder {
             .map_err(|e| Error::ProcessSpawnFailed { source: e })
     }
 
-    /// Starts the job in monitored mode.
-    /// Returns a `JobHandle` to monitor and control the running process.
+    /// Starts the job in monitored mode, returning a `JobHandle`.
+    ///
+    /// This method spawns the `HandBrakeCLI` process and a background task to parse its
+    /// `stdout` and `stderr` streams into a series of `JobEvent`s.
     ///
     /// # Errors
-    /// Returns an error if the process could not be spawned.
+    ///
+    /// Returns an `Error` if the process could not be spawned.
     pub fn start(self) -> Result<JobHandle, Error> {
         let args = self.build_args();
 
