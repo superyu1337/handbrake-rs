@@ -99,6 +99,7 @@ pub struct JobBuilder {
     audio_codecs: HashMap<u32, String>,
     quality: Option<f32>,
     format: Option<String>,
+    subtitle_tracks: Vec<u32>,
 }
 
 impl JobBuilder {
@@ -115,6 +116,7 @@ impl JobBuilder {
             audio_codecs: HashMap::new(),
             quality: None,
             format: None,
+            subtitle_tracks: Vec::new(),
         }
     }
 
@@ -148,6 +150,14 @@ impl JobBuilder {
     /// If called multiple times for the same track, the last call wins.
     pub fn audio_codec(mut self, track: u32, codec: impl Into<String>) -> Self {
         self.audio_codecs.insert(track, codec.into());
+        self
+    }
+
+    /// Adds a subtitle track to the job.
+    ///
+    /// This can be called multiple times to include multiple subtitle tracks.
+    pub fn subtitle(mut self, track: u32) -> Self {
+        self.subtitle_tracks.push(track);
         self
     }
 
@@ -377,6 +387,16 @@ impl JobBuilder {
         }
         if let Some(f) = &self.format {
             args.extend(["--format".into(), f.to_string()]);
+        }
+
+        if !self.subtitle_tracks.is_empty() {
+            let track_list = self
+                .subtitle_tracks
+                .iter()
+                .map(|t| t.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            args.extend(["--subtitle".into(), track_list]);
         }
 
         args
