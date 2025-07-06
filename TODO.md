@@ -79,9 +79,11 @@ This document outlines the development tasks for building the `handbrake` crate.
 
 ## Chunk 9: Subtitles
 - [ ] Implement subtitle track selection in `JobBuilder`.
-- [ ] Implement subtitle import from external files (`--subtitle-import`).
-- [ ] Implement subtitle burn-in (`--subtitle-burned`).
-- [ ] Implement foreign audio scan for subtitles (`--subtitle-scan`).
+- [ ] Implement subtitle burn-in (`--subtitle-burned`), including `native`, or `none` modes.
+- [ ] Implement forcing subtitles (`--subtitle-forced`).
+- [ ] Implement setting default subtitles `--subtitle-default`, including special `none` name.
+- [ ] Implement foreign audio scan for subtitles (`--subtitle`) with the `scan` name.
+- [ ] Implement subtitle import from external SRT and SSA files (`--srt-file`, `--ssa-file`).
 
 ## Chunk 10: Advanced Video Filters
 - [ ] Add a generic `.filter()` method to `JobBuilder` for custom filter strings.
@@ -97,4 +99,4 @@ This document outlines the development tasks for building the `handbrake` crate.
 - [ ] Implement `HandBrake::from_args()` to validate, parse and apply the job parameters.
 - [ ] Implement chapter marker support.
 - [ ] Implement preset validation and listing.
-- [ ] Implement job queueing functionality within `handbrake-rs`.
+- [ ] Implement job queueing functionality within `handbrake` through `--queue-import-file`.
