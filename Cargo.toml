@@ -6,6 +6,7 @@ edition = "2024"
 license = "MIT"
 license-file = "LICENSE"
 repository = "https://github.com/reliq-hq/handbrake-rs"
+keywords = ["video", "audio", "transcode", "media"]
 
 [dependencies]
 async-stream = "0.3.6"
