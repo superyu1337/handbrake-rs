@@ -94,6 +94,7 @@ This document outlines the development tasks for building the `handbrake` crate.
 - [ ] Implement foreign audio search for audio tracks.
 
 ## Chunk 12: Other Features
+- [ ] Implement `HandBrake::from_args()` to validate, parse and apply the job parameters.
 - [ ] Implement chapter marker support.
 - [ ] Implement preset validation and listing.
 - [ ] Implement job queueing functionality within `handbrake-rs`.
