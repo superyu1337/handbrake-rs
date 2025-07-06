@@ -79,6 +79,7 @@ This document outlines the development tasks for building the `handbrake` crate.
 
 ## Chunk 9: Subtitles
 - [ ] Implement subtitle track selection in `JobBuilder`.
+- [ ] Implement support for selecting subtitle tracks by language.
 - [ ] Implement subtitle burn-in (`--subtitle-burned`), including `native`, or `none` modes.
 - [ ] Implement forcing subtitles (`--subtitle-forced`).
 - [ ] Implement setting default subtitles `--subtitle-default`, including special `none` name.
