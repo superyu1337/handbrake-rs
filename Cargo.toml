@@ -5,6 +5,7 @@ version = "0.0.1"
 edition = "2024"
 license = "MIT"
 license-file = "LICENSE"
+documentation = "https://docs.rs/handbrake/"
 repository = "https://github.com/reliq-hq/handbrake-rs"
 keywords = ["video", "audio", "transcode", "media"]
 
