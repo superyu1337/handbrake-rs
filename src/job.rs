@@ -25,7 +25,7 @@ use crate::handle::JobHandle;
 
 static PROGRESS_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"Encoding: task \d+ of \d+, (?P<pct>\d{1,2}\.\d{2}) %( \((?P<fps>\d+\.\d{2}) fps, avg (?P<avg_fps>\d+\.\d{2}) fps, ETA (?P<eta>\d{2}h\d{2}m\d{2}s)\))?",
+        r"Encoding: task \d+ of \d+, (?P<pct>\d{1,2}\.\d{2}) %( (\((?P<fps>\d+\.\d{2}) fps, avg (?P<avg_fps>\d+\.\d{2}) fps, ETA (?P<eta>\d{2}h\d{2}m\d{2}s)\))?",
     )
     .expect("BUG: Failed to compile progress regex")
 });
@@ -69,6 +69,12 @@ impl From<PathBuf> for InputSource {
     }
 }
 
+impl From<&str> for InputSource {
+    fn from(p: &str) -> Self {
+        InputSource::File(p.into())
+    }
+}
+
 /// Represents the output destination for a `HandBrakeCLI` job.
 pub enum OutputDestination {
     /// Write the output to a file.
@@ -81,6 +87,36 @@ impl From<PathBuf> for OutputDestination {
     fn from(p: PathBuf) -> Self {
         OutputDestination::File(p)
     }
+}
+
+impl From<&str> for OutputDestination {
+    fn from(p: &str) -> Self {
+        OutputDestination::File(p.into())
+    }
+}
+
+/// Represents the subtitle selection mode.
+pub enum SubtitleSelection {
+    /// Select specific subtitle tracks by their index.
+    Tracks(Vec<u32>),
+    /// Scan for foreign audio subtitles.
+    Scan,
+}
+
+/// Represents the subtitle burn-in mode as per user request.
+pub enum SubtitleBurnMode {
+    /// Burn subtitles from foreign language audio tracks marked as "forced".
+    Native,
+    /// Disable burning of subtitles.
+    None,
+}
+
+/// Represents the default subtitle track selection.
+pub enum SubtitleDefaultMode {
+    /// Set a specific track as the default.
+    Track(u32),
+    /// Flag no subtitle track as default.
+    None,
 }
 
 /// A fluent builder for configuring a `HandBrakeCLI` encoding job.
@@ -99,7 +135,13 @@ pub struct JobBuilder {
     audio_codecs: HashMap<u32, String>,
     quality: Option<f32>,
     format: Option<String>,
-    subtitle_tracks: Vec<u32>,
+    subtitle_selection: Option<SubtitleSelection>,
+    subtitle_langs: Vec<String>,
+    subtitle_burned: Option<SubtitleBurnMode>,
+    subtitle_forced: Option<u32>,
+    subtitle_default: Option<SubtitleDefaultMode>,
+    srt_file: Option<String>,
+    ssa_file: Option<String>,
 }
 
 impl JobBuilder {
@@ -116,7 +158,13 @@ impl JobBuilder {
             audio_codecs: HashMap::new(),
             quality: None,
             format: None,
-            subtitle_tracks: Vec::new(),
+            subtitle_selection: None,
+            subtitle_langs: Vec::new(),
+            subtitle_burned: None,
+            subtitle_forced: None,
+            subtitle_default: None,
+            srt_file: None,
+            ssa_file: None,
         }
     }
 
@@ -156,8 +204,67 @@ impl JobBuilder {
     /// Adds a subtitle track to the job.
     ///
     /// This can be called multiple times to include multiple subtitle tracks.
+    /// This will override a previous call to `subtitle_scan()`.
     pub fn subtitle(mut self, track: u32) -> Self {
-        self.subtitle_tracks.push(track);
+        let tracks = match self.subtitle_selection {
+            Some(SubtitleSelection::Tracks(mut existing_tracks)) => {
+                existing_tracks.push(track);
+                existing_tracks
+            }
+            _ => vec![track],
+        };
+        self.subtitle_selection = Some(SubtitleSelection::Tracks(tracks));
+        self
+    }
+
+    /// Enables foreign audio scan for subtitles.
+    ///
+    /// This will override any previous calls to `subtitle()`.
+    pub fn subtitle_scan(mut self) -> Self {
+        self.subtitle_selection = Some(SubtitleSelection::Scan);
+        self
+    }
+
+    /// Adds a subtitle language to select tracks by.
+    ///
+    /// Can be called multiple times. e.g., `"eng"`, `"fre"`.
+    /// Uses the `iso639-2` code.
+    pub fn subtitle_lang(mut self, lang: impl Into<String>) -> Self {
+        self.subtitle_langs.push(lang.into());
+        self
+    }
+
+    /// Sets the subtitle burn-in mode.
+    pub fn subtitle_burned(mut self, mode: SubtitleBurnMode) -> Self {
+        self.subtitle_burned = Some(mode);
+        self
+    }
+
+    /// Force display of subtitles from the specified track only if the "forced" flag is set.
+    pub fn subtitle_forced(mut self, track: u32) -> Self {
+        self.subtitle_forced = Some(track);
+        self
+    }
+
+    /// Sets the default subtitle track.
+    pub fn subtitle_default(mut self, mode: SubtitleDefaultMode) -> Self {
+        self.subtitle_default = Some(mode);
+        self
+    }
+
+    /// Imports subtitles from an external SRT file.
+    ///
+    /// The `file` string can include comma-separated srt files.
+    pub fn srt_file(mut self, file: impl Into<String>) -> Self {
+        self.srt_file = Some(file.into());
+        self
+    }
+
+    /// Imports subtitles from an external SSA file.
+    ///
+    /// The `file` string can include comma-separated ssa files.
+    pub fn ssa_file(mut self, file: impl Into<String>) -> Self {
+        self.ssa_file = Some(file.into());
         self
     }
 
@@ -389,14 +496,51 @@ impl JobBuilder {
             args.extend(["--format".into(), f.to_string()]);
         }
 
-        if !self.subtitle_tracks.is_empty() {
-            let track_list = self
-                .subtitle_tracks
-                .iter()
-                .map(|t| t.to_string())
-                .collect::<Vec<String>>()
-                .join(",");
-            args.extend(["--subtitle".into(), track_list]);
+        if let Some(selection) = &self.subtitle_selection {
+            let value = match selection {
+                SubtitleSelection::Tracks(tracks) => tracks
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+                SubtitleSelection::Scan => "scan".to_string(),
+            };
+            args.extend(["--subtitle".into(), value]);
+        }
+
+        if !self.subtitle_langs.is_empty() {
+            args.extend([
+                "--subtitle-lang-list".into(),
+                self.subtitle_langs.join(","),
+            ]);
+        }
+
+        if let Some(mode) = &self.subtitle_burned {
+            let value = match mode {
+                SubtitleBurnMode::Native => "native".to_string(),
+                SubtitleBurnMode::None => "none".to_string(),
+            };
+            args.extend(["--subtitle-burned".into(), value]);
+        }
+
+        if let Some(track) = &self.subtitle_forced {
+            args.extend(["--subtitle-forced".into(), track.to_string()]);
+        }
+
+        if let Some(mode) = &self.subtitle_default {
+            let value = match mode {
+                SubtitleDefaultMode::Track(t) => t.to_string(),
+                SubtitleDefaultMode::None => "none".to_string(),
+            };
+            args.extend(["--subtitle-default".into(), value]);
+        }
+
+        if let Some(srt_file) = &self.srt_file {
+            args.extend(["--srt-file".into(), srt_file.clone()]);
+        }
+
+        if let Some(ssa_file) = &self.ssa_file {
+            args.extend(["--ssa-file".into(), ssa_file.clone()]);
         }
 
         args

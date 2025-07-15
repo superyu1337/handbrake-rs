@@ -78,13 +78,13 @@ This document outlines the development tasks for building the `handbrake` crate.
 - [X] Publish the crate to `crates.io`.
 
 ## Chunk 9: Subtitles
-- [ ] Implement subtitle track selection in `JobBuilder`.
-- [ ] Implement support for selecting subtitle tracks by language.
-- [ ] Implement subtitle burn-in (`--subtitle-burned`), including `native`, or `none` modes.
-- [ ] Implement forcing subtitles (`--subtitle-forced`).
-- [ ] Implement setting default subtitles `--subtitle-default`, including special `none` name.
-- [ ] Implement foreign audio scan for subtitles (`--subtitle`) with the `scan` name.
-- [ ] Implement subtitle import from external SRT and SSA files (`--srt-file`, `--ssa-file`).
+- [X] Implement subtitle track selection in `JobBuilder`.
+- [X] Implement support for selecting subtitle tracks by language.
+- [X] Implement subtitle burn-in (`--subtitle-burned`), including `native`, or `none` modes.
+- [X] Implement forcing subtitles (`--subtitle-forced`).
+- [X] Implement setting default subtitles `--subtitle-default`, including special `none` name.
+- [X] Implement foreign audio scan for subtitles (`--subtitle`) with the `scan` name.
+- [X] Implement subtitle import from external SRT and SSA files (`--srt-file`, `--ssa-file`).
 
 ## Chunk 10: Advanced Video Filters
 - [ ] Add a generic `.filter()` method to `JobBuilder` for custom filter strings.

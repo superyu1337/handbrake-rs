@@ -63,7 +63,7 @@ use tokio::process::Command;
 mod error;
 mod event;
 mod handle;
-mod job;
+pub mod job;
 
 #[cfg(test)]
 mod testing;
