@@ -22,6 +22,7 @@ serde_json = "1.0.140"
 tokio-util = { version = "0.7.15", features = ["full"] }
 
 [dev-dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 
