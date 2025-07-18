@@ -1,7 +1,7 @@
 [package]
 name = "handbrake"
 description = "A safe, ergonomic, and asynchronous Rust crate for controlling the HandBrakeCLI video transcoder."
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
 documentation = "https://docs.rs/handbrake/"
