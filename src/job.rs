@@ -43,7 +43,10 @@ fn parse_eta(eta_str: &str) -> Duration {
     Duration::from_secs(h * 3600 + m * 60 + s)
 }
 
-fn parse_caps<T>(caps: &Captures, name: &str) -> Option<T> where T: Default + FromStr {
+fn parse_caps<T>(caps: &Captures, name: &str) -> Option<T>
+where
+    T: Default + FromStr,
+{
     if let Some(v) = caps.name(name) {
         Some(
             String::from_utf8_lossy(v.as_bytes())
@@ -277,15 +280,7 @@ impl JobBuilder {
         self
     }
 
-    /// Executes the job and waits for completion, returning only the final `ExitStatus`.
-    ///
-    /// This is ideal for "fire-and-forget" scenarios where real-time monitoring is not needed.
-    /// The `stdout` and `stderr` of the child process are inherited by the parent.
-    ///
-    /// # Errors
-    ///
-    /// Returns an `Error` if the process could not be spawned.
-    pub async fn status(self) -> Result<ExitStatus, Error> {
+    fn create_process(self) -> Result<Command, Error> {
         let args = self.build_args();
 
         let stdin_cfg = match self.input {
@@ -298,13 +293,23 @@ impl JobBuilder {
             _ => Stdio::inherit(), // Default to inheriting stdout
         };
 
+        let mut cmd = Command::new(&self.handbrake_path);
+        cmd.args(args).stdin(stdin_cfg).stdout(stdout_cfg);
+        Ok(cmd)
+    }
+
+    /// Executes the job and waits for completion, returning only the final `ExitStatus`.
+    ///
+    /// This is ideal for "fire-and-forget" scenarios where real-time monitoring is not needed.
+    /// The `stdout` and `stderr` of the child process are inherited by the parent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Error` if the process could not be spawned.
+    pub async fn status(self) -> Result<ExitStatus, Error> {
         // For status, we don't need to capture stderr, just let it go to parent process's stderr
         let stderr_cfg = Stdio::inherit();
-
-        Command::new(&self.handbrake_path)
-            .args(args)
-            .stdin(stdin_cfg)
-            .stdout(stdout_cfg)
+        self.create_process()?
             .stderr(stderr_cfg)
             .status()
             .await
@@ -320,16 +325,8 @@ impl JobBuilder {
     ///
     /// Returns an `Error` if the process could not be spawned.
     pub fn start(self) -> Result<JobHandle, Error> {
-        let args = self.build_args();
-
-        let stdin_cfg = match self.input {
-            InputSource::Stdin => Stdio::piped(),
-            _ => Stdio::null(),
-        };
-
-        let mut child = Command::new(&self.handbrake_path)
-            .args(args)
-            .stdin(stdin_cfg)
+        let mut child = self
+            .create_process()?
             .stdout(Stdio::piped()) // always capture stdout
             .stderr(Stdio::piped()) // Must pipe stderr for monitoring
             .spawn()
@@ -509,10 +506,7 @@ impl JobBuilder {
         }
 
         if !self.subtitle_langs.is_empty() {
-            args.extend([
-                "--subtitle-lang-list".into(),
-                self.subtitle_langs.join(","),
-            ]);
+            args.extend(["--subtitle-lang-list".into(), self.subtitle_langs.join(",")]);
         }
 
         if let Some(mode) = &self.subtitle_burned {
