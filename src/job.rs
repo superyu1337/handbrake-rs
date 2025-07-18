@@ -545,3 +545,47 @@ impl JobBuilder {
         args
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::job::PROGRESS_RE;
+
+    #[test]
+    fn test_progress_re_full_match() {
+        let line = "Encoding: task 1 of 1, 12.34 % (120.00 fps, avg 110.00 fps, ETA 00h01m30s)";
+        let caps = PROGRESS_RE.captures(line.as_bytes()).unwrap();
+
+        assert_eq!(&caps["pct"], b"12.34");
+        assert_eq!(&caps["fps"], b"120.00");
+        assert_eq!(&caps["avg_fps"], b"110.00");
+        assert_eq!(&caps["eta"], b"00h01m30s");
+    }
+
+    #[test]
+    fn test_progress_re_pct_only() {
+        let line = "Encoding: task 1 of 1, 56.78 %";
+        let caps = PROGRESS_RE.captures(line.as_bytes()).unwrap();
+
+        assert_eq!(&caps["pct"], b"56.78");
+        assert!(caps.name("fps").is_none());
+        assert!(caps.name("avg_fps").is_none());
+        assert!(caps.name("eta").is_none());
+    }
+
+    #[test]
+    fn test_progress_re_no_match() {
+        let line = "Some other output that does not match";
+        assert!(PROGRESS_RE.captures(line.as_bytes()).is_none());
+    }
+
+    #[test]
+    fn test_progress_re_another_full_match() {
+        let line = "Encoding: task 2 of 5, 99.99 % (30.00 fps, avg 25.50 fps, ETA 01h23m45s)";
+        let caps = PROGRESS_RE.captures(line.as_bytes()).unwrap();
+
+        assert_eq!(&caps["pct"], b"99.99");
+        assert_eq!(&caps["fps"], b"30.00");
+        assert_eq!(&caps["avg_fps"], b"25.50");
+        assert_eq!(&caps["eta"], b"01h23m45s");
+    }
+}
