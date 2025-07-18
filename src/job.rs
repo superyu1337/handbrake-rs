@@ -295,6 +295,11 @@ impl JobBuilder {
 
         let mut cmd = Command::new(&self.handbrake_path);
         cmd.args(args).stdin(stdin_cfg).stdout(stdout_cfg);
+        #[cfg(windows)]
+        {
+            use windows_sys::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP;
+            cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
+        }
         Ok(cmd)
     }
 

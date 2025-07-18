@@ -6,7 +6,7 @@ use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::process::Child;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 #[cfg(windows)]
 use windows_sys;
@@ -29,7 +29,7 @@ impl JobHandle {
     ///
     /// This is the preferred method for stopping a job.
     /// - On Unix, it sends a `SIGINT` signal.
-    /// - On Windows, it sends a `CTRL_C_EVENT`.
+    /// - On Windows, it sends a `CTRL_BREAK_EVENT`.
     ///
     /// # Errors
     ///
@@ -60,11 +60,11 @@ impl JobHandle {
 
         #[cfg(windows)]
         {
-            const CTRL_C_EVENT: u32 = 0;
-            // Sending CTRL_C_EVENT to the process group ID (which is the same as the PID
-            // when CREATE_NEW_PROCESS_GROUP is used) is the equivalent of pressing Ctrl+C.
+            // Sending CTRL_BREAK_EVENT to the process group ID (which is the same as the PID
+            // when CREATE_NEW_PROCESS_GROUP is used) will attempt to gracefully shutdown the process.
             let result = unsafe {
-                windows_sys::Win32::System::Console::GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid)
+                use windows_sys::Win32::System::Console::CTRL_BREAK_EVENT;
+                windows_sys::Win32::System::Console::GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pid)
             };
 
             if result == 0 {
@@ -83,7 +83,10 @@ impl JobHandle {
             // Fallback for unsupported platforms
             Err(Error::ControlFailed {
                 action: "cancel",
-                source: io::Error::new(io::ErrorKind::Unsupported, "Cancel is not supported on this platform"),
+                source: io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "Cancel is not supported on this platform",
+                ),
             })
         }
     }
