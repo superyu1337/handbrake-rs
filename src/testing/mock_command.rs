@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
+#[cfg(windows)]
+use std::os::windows::process::ExitStatusExt;
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 
@@ -178,9 +182,9 @@ impl MockCommand {
 
         // Create a dummy ExitStatus - in practice you might need a more sophisticated approach
         let status = if mock_result.exit_code == 0 {
-            std::process::Command::new("true").status().unwrap()
+            ExitStatusExt::from_raw(0)
         } else {
-            std::process::Command::new("false").status().unwrap()
+            ExitStatusExt::from_raw(255)
         };
 
         Ok(std::process::Output {

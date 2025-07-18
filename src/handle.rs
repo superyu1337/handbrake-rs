@@ -8,6 +8,9 @@ use std::sync::Arc;
 use tokio::process::Child;
 use tokio::sync::{mpsc, Mutex};
 
+#[cfg(windows)]
+use windows_sys;
+
 /// A handle to a running `HandBrakeCLI` job.
 ///
 /// This struct provides two key functionalities:
@@ -26,6 +29,7 @@ impl JobHandle {
     ///
     /// This is the preferred method for stopping a job.
     /// - On Unix, it sends a `SIGINT` signal.
+    /// - On Windows, it sends a `CTRL_C_EVENT`.
     ///
     /// # Errors
     ///
@@ -42,7 +46,7 @@ impl JobHandle {
         {
             use nix::sys::signal::{self, Signal};
             use nix::unistd::Pid;
-            match signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT) {
+            return match signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT) {
                 Ok(()) => Ok(()),
                 Err(e) => Err(Error::ControlFailed {
                     action: "cancel",
@@ -51,7 +55,36 @@ impl JobHandle {
                         format!("Failed with errno: {e}"),
                     ),
                 }),
+            };
+        }
+
+        #[cfg(windows)]
+        {
+            const CTRL_C_EVENT: u32 = 0;
+            // Sending CTRL_C_EVENT to the process group ID (which is the same as the PID
+            // when CREATE_NEW_PROCESS_GROUP is used) is the equivalent of pressing Ctrl+C.
+            let result = unsafe {
+                windows_sys::Win32::System::Console::GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid)
+            };
+
+            if result == 0 {
+                // A non-zero value indicates success.
+                return Err(Error::ControlFailed {
+                    action: "cancel",
+                    source: io::Error::last_os_error(),
+                });
+            } else {
+                return Ok(());
             }
+        }
+
+        #[cfg(not(any(unix, windows)))]
+        {
+            // Fallback for unsupported platforms
+            Err(Error::ControlFailed {
+                action: "cancel",
+                source: io::Error::new(io::ErrorKind::Unsupported, "Cancel is not supported on this platform"),
+            })
         }
     }
 

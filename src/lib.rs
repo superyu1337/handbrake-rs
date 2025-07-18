@@ -112,11 +112,19 @@ async fn validate_executable(path: &PathBuf) -> Result<String, Error> {
     Ok(version_string)
 }
 
+fn executable_name() -> &'static str {
+    #[cfg(unix)]
+    let name = "HandBrakeCLI";
+    #[cfg(windows)]
+    let name = "HandBrakeCLI.exe";
+    name
+}
+
 /// Searches the given PATH string for the HandBrake executable.
 fn find_executable_in_path(path_env: &std::ffi::OsStr) -> Result<PathBuf, Error> {
     let paths = env::split_paths(path_env).collect::<Vec<_>>();
     for path in &paths {
-        let executable_path = path.join("HandBrakeCLI");
+        let executable_path = path.join(executable_name());
         if executable_path.is_file() {
             return Ok(executable_path);
         }
