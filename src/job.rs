@@ -25,7 +25,7 @@ use crate::handle::JobHandle;
 
 static PROGRESS_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"Encoding: task \d+ of \d+, (?P<pct>\d{1,2}\.\d{2}) %( (\((?P<fps>\d+\.\d{2}) fps, avg (?P<avg_fps>\d+\.\d{2}) fps, ETA (?P<eta>\d{2}h\d{2}m\d{2}s)\))?",
+        r"Encoding: task \d+ of \d+, (?P<pct>\d{1,2}\.\d{2}) %( \((?P<fps>\d+\.\d{2}) fps, avg (?P<avg_fps>\d+\.\d{2}) fps, ETA (?P<eta>\d{2}h\d{2}m\d{2}s)\))?",
     )
     .expect("BUG: Failed to compile progress regex")
 });
