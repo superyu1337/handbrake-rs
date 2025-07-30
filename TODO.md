@@ -55,7 +55,7 @@ This document outlines the development tasks for building the `handbrake` crate.
 - [X] Implement parsing logic for `Log` events from non-progress `stderr` lines.
 - [X] Implement simplified `Done` event.
 - [X] Add `JobEvent::Fragment` for raw `stdout` data.
-- [/] In the `stderr` reader task, send parsed `Config`, `Progress`, and `Log` events over the channel.
+- [X] In the `stderr` reader task, send parsed `Config`, `Progress`, and `Log` events over the channel.
 - [X] In the `stderr` reader task, await the final process `ExitStatus` after the stream ends.
 - [X] In the `stderr` reader task, send the final `JobEvent::Done` event.
 - [X] Create an `#[ignore]` integration test for the `start()` method to verify event parsing.

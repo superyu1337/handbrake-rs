@@ -134,6 +134,8 @@ pub struct JobBuilder {
     // Configuration options, stored to ensure "last call wins"
     preset: Option<String>,
     video_codec: Option<String>,
+    width: Option<u32>,
+    height: Option<u32>,
     // Maps track number to codec string. Allows overriding specific tracks.
     audio_codecs: HashMap<u32, String>,
     quality: Option<f32>,
@@ -158,6 +160,8 @@ impl JobBuilder {
             output,
             preset: None,
             video_codec: None,
+            width: None,
+            height: None,
             audio_codecs: HashMap::new(),
             quality: None,
             format: None,
@@ -277,6 +281,16 @@ impl JobBuilder {
     /// Value typically ranges from 0 to 51 (lower is better quality).
     pub fn quality(mut self, quality: f32) -> Self {
         self.quality = Some(quality);
+        self
+    }
+
+    pub fn width(mut self, width: u32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    pub fn height(mut self, height: u32) -> Self {
+        self.height = Some(height);
         self
     }
 
@@ -483,6 +497,12 @@ impl JobBuilder {
         }
         if let Some(vc) = &self.video_codec {
             args.extend(["--encoder".into(), vc.clone()]);
+        }
+        if let Some(w) = &self.width {
+            args.extend(["--width".into(), w.to_string()]);   
+        }
+        if let Some(h) = &self.height {
+            args.extend(["--height".into(), h.to_string()]);
         }
         // Audio codecs
         // Sort by track number for consistent argument order, though not strictly necessary for HBCLI

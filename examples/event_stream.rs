@@ -12,6 +12,12 @@ struct Cli {
     /// The path to the input file.
     #[arg(short, long)]
     input: std::path::PathBuf,
+    /// The width of the output video.
+    #[arg(long)]
+    width: Option<u32>,
+    /// The height of the output video.
+    #[arg(long)]
+    height: Option<u32>,
 }
 
 #[tokio::main]
@@ -33,11 +39,20 @@ async fn main() {
     info!("Starting job with input file: {:?}", cli.input);
     let input = InputSource::from(cli.input);
 
-    let mut job_handle = match handbrake
+    let mut job = handbrake
         .job(input, OutputDestination::Stdout)
         .preset("Very Fast 1080p30")
-        .format("mkv")
-        .start()
+        .format("mkv");
+
+    if let Some(width) = cli.width {
+        job = job.width(width);
+    }
+
+    if let Some(height) = cli.height {
+        job = job.height(height);
+    }
+
+    let mut job_handle = match job.start()
     {
         Ok(handle) => handle,
         Err(e) => {
