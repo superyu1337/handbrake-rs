@@ -126,6 +126,7 @@ pub struct JobBuilder {
     output: OutputDestination,
 
     // Configuration options, stored to ensure "last call wins"
+    import_gui_presets: bool,
     preset: Option<String>,
     video_codec: Option<String>,
     width: Option<u32>,
@@ -152,6 +153,7 @@ impl JobBuilder {
             handbrake_path,
             input,
             output,
+            import_gui_presets: false,
             preset: None,
             video_codec: None,
             width: None,
@@ -167,6 +169,14 @@ impl JobBuilder {
             srt_file: None,
             ssa_file: None,
         }
+    }
+
+    /// Enables import of HandBrake GUI presets.
+    /// 
+    /// Equivalent to setting the `--preset-import-gui` flag.
+    pub fn import_gui_presets(mut self, import_gui_presets: bool) -> Self {
+        self.import_gui_presets = import_gui_presets;
+        self
     }
 
     /// Sets the `HandBrakeCLI` preset.
@@ -465,6 +475,10 @@ impl JobBuilder {
     /// Builds the final list of command-line arguments based on the configured options.
     pub fn build_args(&self) -> Vec<String> {
         let mut args: Vec<String> = Vec::new();
+
+        if self.import_gui_presets {
+            args.push("--preset-import-gui".into());
+        }
 
         // Input argument
         match &self.input {
