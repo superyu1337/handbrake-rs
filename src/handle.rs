@@ -46,7 +46,7 @@ impl JobHandle {
         {
             use nix::sys::signal::{self, Signal};
             use nix::unistd::Pid;
-            return match signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT) {
+            match signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT) {
                 Ok(()) => Ok(()),
                 Err(e) => Err(Error::ControlFailed {
                     action: "cancel",
@@ -55,7 +55,7 @@ impl JobHandle {
                         format!("Failed with errno: {e}"),
                     ),
                 }),
-            };
+            }
         }
 
         #[cfg(windows)]

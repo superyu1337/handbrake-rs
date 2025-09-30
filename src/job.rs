@@ -47,15 +47,9 @@ fn parse_caps<T>(caps: &Captures, name: &str) -> Option<T>
 where
     T: Default + FromStr,
 {
-    if let Some(v) = caps.name(name) {
-        Some(
-            String::from_utf8_lossy(v.as_bytes())
-                .parse::<T>()
-                .unwrap_or_default(),
-        )
-    } else {
-        None
-    }
+    caps.name(name).map(|v| String::from_utf8_lossy(v.as_bytes())
+        .parse::<T>()
+        .unwrap_or_default())
 }
 
 /// Represents the input source for a `HandBrakeCLI` job.
@@ -387,22 +381,17 @@ impl JobBuilder {
                 let line = select! {
                     read_status = stdout_reader.read_until(b'\r', &mut out_buf) => {
                         // propagate the error
-                        if let Ok(bytes_read) = read_status {
-                            if bytes_read == 0 {
-                                event_parsing_state = EventStreamState::Eof;
-                            }
+                        if let Ok(bytes_read) = read_status && bytes_read == 0 {
+                            event_parsing_state = EventStreamState::Eof;
                         }
+
                         Ok(match PROGRESS_RE.captures(&out_buf) {
                             Some(caps) => {
                                 let event = JobEvent::Progress(crate::Progress {
                                     percentage: parse_caps(&caps, "pct").unwrap_or_default(),
                                     fps: parse_caps(&caps, "fps").unwrap_or_default(),
                                     avg_fps: parse_caps(&caps, "avg_fps"),
-                                    eta: if let Some(v) = caps.name("eta") {
-                                        Some(parse_eta(&String::from_utf8_lossy(v.as_bytes())))
-                                    } else {
-                                        None
-                                    },
+                                    eta: caps.name("eta").map(|v| parse_eta(&String::from_utf8_lossy(v.as_bytes()))),
                                 });
                                 // remove all occurrences of the progress
                                 out_buf = PROGRESS_RE.replace_all(&out_buf, b"").into();
@@ -444,7 +433,7 @@ impl JobBuilder {
                     Ok(event) => {
                         let _ = event_tx.send(event).await;
                         // send the trailing/preceding output buffer
-                        if out_buf.len() > 0 {
+                        if !out_buf.is_empty() {
                             let _ = event_tx.send(JobEvent::Fragment(out_buf.to_vec())).await;
                         }
                     }
