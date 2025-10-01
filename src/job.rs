@@ -116,6 +116,22 @@ pub enum SubtitleDefaultMode {
     None,
 }
 
+pub enum PreserveHdrMetadata {
+    Hdr10,
+    DolbyVision,
+    All
+}
+
+impl std::fmt::Display for PreserveHdrMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PreserveHdrMetadata::Hdr10 => f.write_str("hdr10plus"),
+            PreserveHdrMetadata::DolbyVision => f.write_str("dolbyvision"),
+            PreserveHdrMetadata::All => f.write_str("all"),
+        }
+    }
+}
+
 /// A fluent builder for configuring a `HandBrakeCLI` encoding job.
 pub struct JobBuilder {
     // The path to the HandBrakeCLI executable, copied from HandBrake instance
@@ -129,6 +145,7 @@ pub struct JobBuilder {
     import_gui_presets: bool,
     preset: Option<String>,
     video_codec: Option<String>,
+    preserve_hdr_metadata: Option<PreserveHdrMetadata>,
     width: Option<u32>,
     height: Option<u32>,
     // Maps track number to codec string. Allows overriding specific tracks.
@@ -156,6 +173,7 @@ impl JobBuilder {
             import_gui_presets: false,
             preset: None,
             video_codec: None,
+            preserve_hdr_metadata: None,
             width: None,
             height: None,
             audio_codecs: HashMap::new(),
@@ -192,6 +210,16 @@ impl JobBuilder {
     /// e.g., `"x265"`, `"hevc"`, `"av1"`
     pub fn video_codec(mut self, codec: impl Into<String>) -> Self {
         self.video_codec = Some(codec.into());
+        self
+    }
+
+    /// Sets HDR metadata preservation
+    /// 
+    /// e.g., `Some(All), Some(DolbyVision), None`
+    /// 
+    /// `None` behaviour is the same as if neither `--hdr-dynamic-metadata` or `--no-hdr-dynamic-metadata` were set
+    pub fn preserve_hdr_metadata(mut self, preserve_hdr_metadata: Option<PreserveHdrMetadata>) -> Self {
+        self.preserve_hdr_metadata = preserve_hdr_metadata;
         self
     }
 
@@ -506,6 +534,9 @@ impl JobBuilder {
         }
         if let Some(h) = &self.height {
             args.extend(["--height".into(), h.to_string()]);
+        }
+        if let Some(phdrmd) = &self.preserve_hdr_metadata {
+            args.extend(["--hdr-dynamic-metadata".into(), phdrmd.to_string()]);
         }
         // Audio codecs
         // Sort by track number for consistent argument order, though not strictly necessary for HBCLI
