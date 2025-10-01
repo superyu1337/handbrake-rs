@@ -145,6 +145,7 @@ pub struct JobBuilder {
     import_gui_presets: bool,
     preset: Option<String>,
     video_codec: Option<String>,
+    advanced_encoder_options: Option<String>,
     preserve_hdr_metadata: Option<PreserveHdrMetadata>,
     width: Option<u32>,
     height: Option<u32>,
@@ -173,6 +174,7 @@ impl JobBuilder {
             import_gui_presets: false,
             preset: None,
             video_codec: None,
+            advanced_encoder_options: None,
             preserve_hdr_metadata: None,
             width: None,
             height: None,
@@ -210,6 +212,14 @@ impl JobBuilder {
     /// e.g., `"x265"`, `"hevc"`, `"av1"`
     pub fn video_codec(mut self, codec: impl Into<String>) -> Self {
         self.video_codec = Some(codec.into());
+        self
+    }
+
+    /// Set advanced encoder options.
+    /// 
+    /// e.g., 'scm=0:enable-tf=0'
+    pub fn advanced_encoder_options(mut self, advanced_encoder_options: String) -> Self {
+        self.advanced_encoder_options = Some(advanced_encoder_options);
         self
     }
 
