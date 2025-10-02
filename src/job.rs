@@ -359,6 +359,27 @@ impl JobBuilder {
         Ok(cmd)
     }
 
+    fn create_process_with_args(self, args: Vec<String>) -> Result<Command, Error> {
+        let stdin_cfg = match self.input {
+            InputSource::Stdin => Stdio::piped(),
+            _ => Stdio::inherit(), // Default to inheriting stdin
+        };
+
+        let stdout_cfg = match self.output {
+            OutputDestination::Stdout => Stdio::piped(),
+            _ => Stdio::inherit(), // Default to inheriting stdout
+        };
+
+        let mut cmd = Command::new(&self.handbrake_path);
+        cmd.args(args).stdin(stdin_cfg).stdout(stdout_cfg);
+        #[cfg(windows)]
+        {
+            use windows_sys::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP;
+            cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
+        }
+        Ok(cmd)
+    }
+
     /// Executes the job and waits for completion, returning only the final `ExitStatus`.
     ///
     /// This is ideal for "fire-and-forget" scenarios where real-time monitoring is not needed.
@@ -509,6 +530,140 @@ impl JobBuilder {
 
         Ok(JobHandle { child, event_rx })
     }
+
+    /// Starts the job in monitored mode with custom args, returning a `JobHandle`.
+    ///
+    /// This method spawns the `HandBrakeCLI` process and a background task to parse its
+    /// `stdout` and `stderr` streams into a series of `JobEvent`s.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Error` if the process could not be spawned.
+    pub fn start_with_args(self, args: Vec<String>) -> Result<JobHandle, Error> {
+        let mut child = self
+            .create_process_with_args(args)?
+            .stdout(Stdio::piped()) // always capture stdout
+            .stderr(Stdio::piped()) // Must pipe stderr for monitoring
+            .spawn()
+            .map_err(|e| Error::ProcessSpawnFailed { source: e })?;
+
+        // Channel for sending events from the background task to the main handle.
+        let (event_tx, event_rx) = mpsc::channel(128);
+
+        // We must take ownership of stderr to read from it.
+        let stderr = child
+            .stderr
+            .take()
+            .expect("BUG: stderr was not captured. This should not happen when piping.");
+
+        let stdout = child.stdout.take().expect("BUG: stdout was not captured.");
+
+        let child = Arc::new(Mutex::new(child));
+        let waiter = Arc::clone(&child);
+
+        // Spawn a background task to read from stderr and stdout and parse events.
+        tokio::spawn(async move {
+            let mut stdout_reader = BufReader::new(stdout);
+            let mut stderr_reader = FramedRead::new(stderr, LinesCodec::default());
+
+            // State for parsing the JSON block
+            let mut job_config_buffer = String::new();
+            let mut in_json_block = false;
+
+            #[derive(PartialEq)]
+            enum EventStreamState {
+                Active,
+                Eof,
+            }
+
+            let mut event_parsing_state = EventStreamState::Active;
+
+            while event_parsing_state == EventStreamState::Active {
+                let mut out_buf: Vec<u8> = Vec::new();
+                let line = select! {
+                    read_status = stdout_reader.read_until(b'\r', &mut out_buf) => {
+                        // propagate the error
+                        if let Ok(bytes_read) = read_status && bytes_read == 0 {
+                            event_parsing_state = EventStreamState::Eof;
+                        }
+
+                        Ok(match PROGRESS_RE.captures(&out_buf) {
+                            Some(caps) => {
+                                let event = JobEvent::Progress(crate::Progress {
+                                    percentage: parse_caps(&caps, "pct").unwrap_or_default(),
+                                    fps: parse_caps(&caps, "fps").unwrap_or_default(),
+                                    avg_fps: parse_caps(&caps, "avg_fps"),
+                                    eta: caps.name("eta").map(|v| parse_eta(&String::from_utf8_lossy(v.as_bytes()))),
+                                });
+                                // remove all occurrences of the progress
+                                out_buf = PROGRESS_RE.replace_all(&out_buf, b"").into();
+
+                                event
+                            },
+                            None => JobEvent::Fragment(out_buf.to_vec()),
+                        })
+                    },
+                    line = stderr_reader.next() => match line {
+                        Some(Ok(v)) => {
+                            if v.ends_with("json job:") {
+                                in_json_block = true;
+                                continue; // Continue to next iteration to buffer more lines
+                            }
+
+                            if in_json_block {
+                                job_config_buffer.push_str(&v);
+                                job_config_buffer.push('\n');
+                                if v == "}" {
+                                    in_json_block = false;
+                                    match serde_json::from_str::<crate::event::Config>(&job_config_buffer) {
+                                        Ok(config) => Ok(JobEvent::Config(config)),
+                                        Err(e) => Ok(JobEvent::Log(Log { message: format!("JSON Parse Error: {}, \n{}", e, job_config_buffer) })),
+                                    }
+                                } else {
+                                    continue; // Continue buffering
+                                }
+                            } else {
+                                Ok(JobEvent::Log(Log { message: v }))
+                            }
+                        },
+                        Some(Err(e)) => Err(std::io::Error::new(io::ErrorKind::InvalidData, e)),
+                        None => continue,
+                    },
+                };
+
+                match line {
+                    Ok(event) => {
+                        let _ = event_tx.send(event).await;
+                        // send the trailing/preceding output buffer
+                        if !out_buf.is_empty() {
+                            let _ = event_tx.send(JobEvent::Fragment(out_buf.to_vec())).await;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = event_tx
+                            .send(JobEvent::Log(Log {
+                                message: format!("Failed to read the line: {:?}", e).to_string(),
+                            }))
+                            .await;
+                    }
+                };
+            }
+            match waiter.lock().await.wait().await {
+                Ok(status) => event_tx.send(JobEvent::Done(Ok(status))).await,
+                Err(e) => {
+                    event_tx
+                        .send(JobEvent::Done(Err(crate::JobFailure {
+                            message: format!("Failed: {}", e),
+                            exit_code: e.raw_os_error(),
+                        })))
+                        .await
+                }
+            }
+        });
+
+        Ok(JobHandle { child, event_rx })
+    }
+
 
     /// Builds the final list of command-line arguments based on the configured options.
     pub fn build_args(&self) -> Vec<String> {
